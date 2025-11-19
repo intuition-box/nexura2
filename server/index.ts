@@ -51,38 +51,46 @@ app.use((req, res, next) => {
 app.use("/attached_assets", express.static(path.resolve(import.meta.dirname, "..", "attached_assets")));
 
 (async () => {
-  const server = await registerRoutes(app);
+  try {
+    const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
-  });
+      res.status(status).json({ message });
+      console.error('Express error handler:', err);
+    });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+    // importantly only setup vite in development and after
+    // setting up all the other routes so the catch-all route
+    // doesn't interfere with the other routes
+    if (app.get("env") === "development") {
+      await setupVite(app, server);
+    } else {
+      serveStatic(app);
+    }
+
+    // ALWAYS serve the app on the port specified in the environment variable PORT
+    // Render and other cloud platforms use the PORT environment variable
+    // Default to 5051 for local development
+    const port = parseInt(process.env.PORT || '5051', 10);
+    const host = process.env.HOST || "0.0.0.0";
+    
+    // `reusePort` is not supported on some platforms (notably Windows). Only set it when
+    // the platform looks like a Unix-like environment.
+    const listenOptions: any = { port, host };
+    if (process.platform !== "win32") {
+      listenOptions.reusePort = true;
+    }
+
+    server.listen(listenOptions, () => {
+      log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode`);
+      log(`🌐 Listening on ${host}:${port}`);
+      log(`📊 Health check: http://${host === "0.0.0.0" ? "localhost" : host}:${port}/health`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
   }
-
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5051', 10);
-  // `reusePort` is not supported on some platforms (notably Windows). Only set it when
-  // the platform looks like a Unix-like environment.
-  const listenOptions: any = { port, host: "0.0.0.0" };
-  if (process.platform !== "win32") {
-    listenOptions.reusePort = true;
-  }
-
-  server.listen(listenOptions, () => {
-    log(`serving on port ${port}`);
-  });
 })();

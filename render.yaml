@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: nexura
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: SESSION_COOKIE_NAME
+        value: nexura_sid
+      - key: TWITTER_API_KEY
+        sync: false
+      - key: TWITTER_API_SECRET
+        sync: false
+      - key: TWITTER_CALLBACK_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
