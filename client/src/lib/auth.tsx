@@ -29,6 +29,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.warn("Network error fetching profile:", err);
           return null;
         });
+
+        console.log("passed first fetch");
         
         if (!res || !res.ok) {
           console.warn("Could not restore session: API returned", res?.status || "no response");
@@ -45,6 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
           return;
         }
+
+        console.log("passed json parse");
         
         // /api/me returns { user, profile, hasProfile }
         // Validate that user is an object before setting
@@ -61,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (userData && typeof userData === 'object' && !Array.isArray(userData) && userData !== null) {
           console.log('[AuthProvider] Setting valid user data');
+          console.log("dilly");
           setUser(userData);
         } else {
           console.error('[AuthProvider] Invalid user data structure:', typeof userData, Array.isArray(userData), userData);
