@@ -10,6 +10,16 @@ const challenges = new Map<string, { message: string; expiresAt: number; used?: 
 const sessions = new Map<string, { address: string; createdAt: number }>();
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint for monitoring and load balancers
+  app.get("/health", (req, res) => {
+    res.status(200).json({ 
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development'
+    });
+  });
+
   // Referral system routes
   app.get("/api/referrals/stats/:userId", async (req, res) => {
     try {
@@ -557,10 +567,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { displayName, avatar, socialProfiles } = req.body || {};
       
+      // Get current profile to preserve existing avatar
+      const currentProfile = await storage.getUserProfile(user.id);
+      
       // Update user profile
       await storage.updateUserProfile(user.id, {
         displayName: displayName || user.username,
-        avatar: avatar || user.avatar,
+        avatar: avatar || currentProfile?.avatar || null,
         socialProfiles: socialProfiles || {}
       });
 
