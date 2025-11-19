@@ -1,0 +1,23 @@
+{
+  "name": "smart-contract",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ignition": "^3.0.0",
+    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.0",
+    "@types/bun": "latest",
+    "@types/chai": "^5.2.3",
+    "@types/node": "^22.8.5",
+    "forge-std": "foundry-rs/forge-std#v1.9.4",
+    "viem": "^2.30.0"
+  },
+  "peerDependencies": {
+    "typescript": "~5.8.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.4.0",
+    "chai": "^6.2.0",
+    "hardhat": "^3.0.10"
+  }
+}

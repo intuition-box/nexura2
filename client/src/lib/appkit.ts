@@ -1,0 +1,136 @@
+/**
+ * Reown AppKit initializer.
+ *
+ * This file dynamically imports `@reown/appkit` and the Wagmi adapter and
+ * initializes a singleton modal instance. If the optional packages are not
+ * available, functions gracefully noop.
+ */
+
+let _modal: any = undefined;
+
+const DEFAULT_PROJECT_ID = "fb6bea018dee724957900b253ba9683c";
+
+export async function initAppKit(projectId?: string) {
+  if (typeof window === "undefined") return null;
+  if (_modal !== undefined) return _modal;
+  // Add a targeted handler to suppress the specific authorization rejection
+  // emitted by AppKit when the project hasn't been authorized for this origin.
+  // We only suppress the message to prevent noisy unhandled promise rejections
+  // from breaking user experience during local development. Other errors pass through.
+  try {
+    const localOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
+    window.addEventListener("unhandledrejection", (ev: PromiseRejectionEvent) => {
+      try {
+        const reason = ev.reason as any;
+        const msg = typeof reason === "string" ? reason : reason?.message ?? String(reason);
+        if (typeof msg === "string" && msg.includes("has not been authorized")) {
+          // Only suppress for localhost-like origins to avoid hiding real production issues
+          if (localOrigin?.includes("localhost") || localOrigin?.includes("127.0.0.1") || localOrigin?.includes(":5051") ) {
+            ev.preventDefault();
+            // eslint-disable-next-line no-console
+            console.warn("Reown AppKit authorization error suppressed:", msg);
+          }
+        }
+      } catch (e) {
+        // swallow any issues inside our handler
+      }
+    });
+  } catch (e) {
+    // ignore in environments without window
+  }
+
+  try {
+    const { createAppKit } = await import("@reown/appkit");
+    const { WagmiAdapter } = await import("@reown/appkit-adapter-wagmi");
+    const networksModule = await import("@reown/appkit/networks");
+
+    const networks = [] as any[];
+    if (networksModule?.mainnet) networks.push(networksModule.mainnet as any);
+    if (networksModule?.arbitrum) networks.push(networksModule.arbitrum as any);
+    
+    // Add Intuition testnet
+    const intuitionTestnet = {
+      id: 13579,
+      name: 'Intuition Testnet',
+      network: 'intuition-testnet',
+      nativeCurrency: {
+        name: 'Ethereum',
+        symbol: 'ETH',
+        decimals: 18
+      },
+      rpcUrls: {
+        default: { http: ['https://testnet.rpc.intuition.systems'] },
+        public: { http: ['https://testnet.rpc.intuition.systems'] }
+      },
+      blockExplorers: {
+        default: { name: 'Explorer', url: 'https://testnet.explorer.intuition.systems' }
+      },
+      testnet: true
+    };
+    networks.push(intuitionTestnet);
+
+  const pid = projectId ?? (window as any).__REOWN_PROJECT_ID ?? DEFAULT_PROJECT_ID;
+  const wagmiAdapter = new WagmiAdapter({ projectId: pid, networks });
+
+    const metadata = {
+      name: "Nexura",
+      description: "Nexura dapp",
+      url: typeof window !== "undefined" ? window.location.origin : "https://example.com",
+      icons: [],
+    } as any;
+
+    try {
+      _modal = createAppKit({
+        adapters: [wagmiAdapter],
+        networks: networks as any,
+        metadata,
+        projectId: pid,
+        features: { analytics: true },
+      }) as any;
+
+      return _modal;
+    } catch (innerErr) {
+      // createAppKit may throw asynchronously or synchronously if the project
+      // isn't authorized for this origin. Provide a safe no-op modal so the
+      // rest of the app (wallet logic) can continue to function without crashing.
+      // eslint-disable-next-line no-console
+      console.warn("AppKit create failed, falling back to no-op modal:", innerErr);
+      const noopModal = {
+        isAvailable: false,
+        open: () => {
+          // eslint-disable-next-line no-console
+          console.warn("Attempted to open AppKit modal but AppKit is unavailable.");
+        },
+        close: () => {},
+      } as any;
+      _modal = noopModal;
+      return _modal;
+    }
+  } catch (err) {
+    // Optional dependency not installed or initialization failed.
+    // eslint-disable-next-line no-console
+    console.warn("AppKit init failed:", err);
+    const noopModal = {
+      isAvailable: false,
+      open: () => {
+        // eslint-disable-next-line no-console
+        console.warn("Attempted to open AppKit modal but AppKit is unavailable.");
+      },
+      close: () => {},
+    } as any;
+    _modal = noopModal;
+    return _modal;
+  }
+}
+
+export async function getAppKit() {
+  if (_modal !== undefined) return _modal;
+  return await initAppKit();
+}
+
+export async function openAppKit(projectId?: string) {
+  const modal = await initAppKit(projectId);
+  if (modal?.open) modal.open();
+}
+
+export default { initAppKit, getAppKit, openAppKit };
