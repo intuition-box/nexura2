@@ -10,24 +10,6 @@ const challenges = new Map<string, { message: string; expiresAt: number; used?: 
 const sessions = new Map<string, { address: string; createdAt: number }>();
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Health check endpoint for Render and monitoring
-  app.get("/health", (req, res) => {
-    res.status(200).json({ 
-      status: "ok", 
-      timestamp: new Date().toISOString(),
-      env: process.env.NODE_ENV,
-      port: process.env.PORT
-    });
-  });
-
-  // Root endpoint
-  app.get("/", (req, res) => {
-    res.status(200).json({ 
-      message: "Nexura API is running",
-      version: "1.0.0"
-    });
-  });
-
   // Referral system routes
   app.get("/api/referrals/stats/:userId", async (req, res) => {
     try {
