@@ -91,26 +91,22 @@ export default function EditProfile() {
   const handleFileSelect = (file: File | null) => {
     if (!file) return;
     
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast({ title: "Invalid file", description: "Please select an image file", variant: "destructive" });
       return;
     }
     
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Please select an image under 5MB", variant: "destructive" });
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Please select an image under 2MB", variant: "destructive" });
       return;
     }
     
-    // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setAvatarPreview(reader.result as string);
     };
     reader.readAsDataURL(file);
     
-    // Store file for upload
     setProfileData(prev => ({ ...prev, avatarFile: file }));
   };
 

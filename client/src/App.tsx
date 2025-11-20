@@ -81,7 +81,7 @@ function App() {
               const isStudio = location?.startsWith?.("/studio");
               const isProject = location?.startsWith?.("/project/");
               return (
-                <div className="flex h-screen w-full bg-background">
+                <div className="flex h-screen w-full bg-black text-white selection:bg-blue-500/30">
                   {!isStudio && !isProject && <NexuraSidebar />}
                   <div className={`flex flex-col flex-1 ${isStudio ? '' : ''}`}>
                     {/* Top Header with Profile Bar (hide on Studio and Project dashboard pages) */}

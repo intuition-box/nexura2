@@ -56,8 +56,8 @@ export default function Achievements() {
             return (
               <Card 
                 key={achievement.level}
-                className={`relative overflow-hidden transition-all hover-elevate ${
-                  isUnlocked ? 'border-primary/50 bg-primary/5' : 'border-border'
+                className={`glass glass-hover rounded-3xl relative overflow-hidden transition-all ${
+                  isUnlocked ? 'border-primary/50 bg-primary/5' : 'border-white/10'
                 }`}
                 data-testid={`achievement-level-${achievement.level}`}
               >

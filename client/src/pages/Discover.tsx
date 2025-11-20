@@ -175,16 +175,23 @@ export default function Discover() {
 
 
   return (
-    <div className="min-h-screen bg-background overflow-auto" data-testid="discover-page">
+    <div className="min-h-screen bg-black text-white overflow-auto relative" data-testid="discover-page">
+      {/* Animated Background Blobs */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-blue-600/20 rounded-full blur-[120px] animate-blob mix-blend-screen" />
+        <div className="absolute top-[20%] right-[-10%] w-[40vw] h-[40vw] bg-purple-600/20 rounded-full blur-[120px] animate-blob animation-delay-2000 mix-blend-screen" />
+        <div className="absolute bottom-[-10%] left-[20%] w-[45vw] h-[45vw] bg-indigo-600/20 rounded-full blur-[120px] animate-blob animation-delay-4000 mix-blend-screen" />
+      </div>
+
       {/* Top Bar */}
-      <div className="flex items-center justify-between p-4 border-b border-border/40">
+      <div className="relative z-10 flex items-center justify-between p-4 border-b border-white/10 glass">
         <div className="flex items-center space-x-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/40" />
             <input
               type="text"
               placeholder="Search"
-              className="pl-10 pr-4 py-2 bg-muted rounded-lg border-0 focus:ring-2 focus:ring-primary/20 w-64"
+              className="pl-10 pr-4 py-2 glass rounded-full border-0 focus:ring-2 focus:ring-primary/20 w-64 text-white placeholder:text-white/40"
               data-testid="input-search"
             />
           </div>
@@ -195,7 +202,7 @@ export default function Discover() {
       </div>
 
       {/* Main Content */}
-      <div className="p-6">
+      <div className="p-6 relative z-10">
   {/* Hero Campaign Section */}
   <HeroCampaign campaigns={campaignsData?.campaigns ?? []} />
 
@@ -209,7 +216,7 @@ export default function Discover() {
             {/* Trending Campaigns */}
             <section>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-foreground">Trending Campaigns</h2>
+                <h2 className="text-2xl md:text-4xl font-bold tracking-tight text-white">Trending Campaigns</h2>
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -235,7 +242,7 @@ export default function Discover() {
             {/* Trending Dapps */}
             <section>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-foreground">Trending Dapps</h2>
+                <h2 className="text-2xl md:text-4xl font-bold tracking-tight text-white">Trending Dapps</h2>
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -249,21 +256,21 @@ export default function Discover() {
                 {trendingDapps.map((dapp, index) => (
                   <div 
                     key={`dapp-${index}`} 
-                    className="group flex flex-col items-center p-4 rounded-lg bg-card hover:bg-card/80 border border-card-border hover-elevate transition-colors cursor-pointer"
+                    className="group flex flex-col items-center p-4 rounded-2xl glass glass-hover transition-all cursor-pointer"
                     onClick={() => setLocation('/ecosystem-dapps')}
                     data-testid={`trending-dapp-${dapp.name.toLowerCase()}`}
                   >
-                    <div className="w-12 h-12 mb-3 rounded-full overflow-hidden bg-muted flex items-center justify-center">
+                    <div className="w-12 h-12 mb-3 rounded-full overflow-hidden bg-white/5 flex items-center justify-center">
                       {typeof dapp.logo === 'string' && dapp.logo.startsWith('/') ? (
                         <img src={dapp.logo} alt={dapp.name} className="w-full h-full object-cover" />
                       ) : (
                         <img src={dapp.logo} alt={dapp.name} className="w-full h-full object-cover" />
                       )}
                     </div>
-                    <span className="text-sm font-medium text-card-foreground group-hover:text-primary transition-colors text-center">
+                    <span className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors text-center">
                       {dapp.name}
                     </span>
-                    <div className="text-xs text-muted-foreground mt-1">
+                    <div className="text-xs text-white/50 mt-1">
                       {dapp.category}
                     </div>
                   </div>
@@ -274,7 +281,7 @@ export default function Discover() {
             {/* Trending Claims in Intuition Portal */}
             <section>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-foreground">Trending Claims in Intuition Portal</h2>
+                <h2 className="text-2xl md:text-4xl font-bold tracking-tight text-white">Trending Claims in Intuition Portal</h2>
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -287,13 +294,11 @@ export default function Discover() {
                 {trendingClaims.map((claim, index) => (
                   <div 
                     key={`claim-${index}`} 
-                    className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-6 hover-elevate cursor-pointer transition-all duration-200 relative overflow-hidden"
+                    className="glass glass-hover rounded-3xl p-6 cursor-pointer transition-all duration-300 relative overflow-hidden"
                     data-testid={`trending-claim-${index}`}
                   >
                     {/* Background Pattern */}
-                    <div className="absolute inset-0 opacity-10">
-                      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-transparent"></div>
-                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
                     
                     {/* Content */}
                     <div className="relative z-10">
@@ -328,7 +333,7 @@ export default function Discover() {
                       
                       {/* Claim Content */}
                       <div className="mb-4">
-                        <p className="text-sm text-gray-300 leading-relaxed line-clamp-4">{claim.content}</p>
+                        <p className="text-sm text-white/70 leading-relaxed line-clamp-4">{claim.content}</p>
                       </div>
                       
                       {/* Engagement Metrics */}

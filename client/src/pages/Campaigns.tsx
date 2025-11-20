@@ -166,8 +166,8 @@ export default function Campaigns() {
           {isLoading ? (
             <div className="text-center py-12 text-muted-foreground">Loading campaigns...</div>
           ) : activeCampaigns.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">No active campaigns at the moment. Check back soon!</p>
+            <Card className="glass glass-hover rounded-3xl p-8 text-center">
+              <p className="text-white/60">No active campaigns at the moment. Check back soon!</p>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -190,8 +190,8 @@ export default function Campaigns() {
           {isLoading ? (
             <div className="text-center py-12 text-muted-foreground">Loading campaigns...</div>
           ) : upcomingCampaigns.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">No upcoming campaigns scheduled.</p>
+            <Card className="glass glass-hover rounded-3xl p-8 text-center">
+              <p className="text-white/60">No upcoming campaigns scheduled.</p>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -201,7 +201,7 @@ export default function Campaigns() {
         </div>
 
         {/* Information Box */}
-        <Card className="bg-primary/5 border-primary/20">
+        <Card className="glass glass-hover rounded-3xl">
           <CardContent className="p-6">
             <div className="flex items-start space-x-4">
               <Users className="w-6 h-6 text-primary mt-1" />

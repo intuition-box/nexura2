@@ -61,18 +61,20 @@ export default function CampaignCard({
 
   return (
     <Card 
-      className="overflow-hidden hover-elevate cursor-pointer group relative" 
+      className="overflow-hidden glass glass-hover cursor-pointer group relative rounded-3xl hover:-translate-y-1 transition-all duration-300" 
       onClick={handleClick}
       data-testid={`campaign-card-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
+      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      
       {/* Hero Image */}
       <div className="relative h-48 overflow-hidden">
         <img 
           src={heroImage} 
           alt={title}
-          className="w-full h-full object-cover transition-transform group-hover:scale-105"
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
         
         {/* Participant Count Overlay */}
         <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1">

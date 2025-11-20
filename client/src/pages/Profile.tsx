@@ -147,7 +147,7 @@ export default function Profile() {
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <h1 className="text-3xl font-bold gradient-text neon-glow">My Profile</h1>
+            <h1 className="text-3xl font-bold text-white">My Profile</h1>
           </div>
           <div className="flex items-center gap-3">
             <Link href="/profile/edit">
@@ -199,7 +199,7 @@ export default function Profile() {
                   </AvatarFallback>
                 </Avatar>
                 <div 
-                  className="absolute -bottom-2 -right-2 w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold border-4 border-background bg-gradient-to-br from-purple-700 via-blue-600 to-cyan-500 shadow-xl animate-pulse"
+                  className="absolute -bottom-2 -right-2 w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold border-4 border-background bg-gradient-to-br from-purple-700 via-blue-600 to-cyan-500 shadow-xl"
                 >
                   {levelValue}
                 </div>
@@ -239,43 +239,43 @@ export default function Profile() {
         </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card data-testid="stat-quests">
+          <Card className="glass glass-hover rounded-3xl" data-testid="stat-quests">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Quests</CardTitle>
+              <CardTitle className="text-sm font-bold text-white">Quests</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{userData?.questsCompleted ?? userData?.quests_completed ?? 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">Completed</p>
+              <div className="text-2xl font-bold text-white">{userData?.questsCompleted ?? userData?.quests_completed ?? 0}</div>
+              <p className="text-xs text-white/60 mt-1">Completed</p>
             </CardContent>
           </Card>
 
-          <Card data-testid="stat-tasks">
+          <Card className="glass glass-hover rounded-3xl" data-testid="stat-tasks">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Tasks</CardTitle>
+              <CardTitle className="text-sm font-bold text-white">Tasks</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{userData?.tasksCompleted ?? userData?.tasks_completed ?? 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">Completed</p>
+              <div className="text-2xl font-bold text-white">{userData?.tasksCompleted ?? userData?.tasks_completed ?? 0}</div>
+              <p className="text-xs text-white/60 mt-1">Completed</p>
             </CardContent>
           </Card>
 
-          <Card data-testid="stat-total-xp">
+          <Card className="glass glass-hover rounded-3xl" data-testid="stat-total-xp">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total XP</CardTitle>
+              <CardTitle className="text-sm font-bold text-white">Total XP</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{xpValue}</div>
-              <p className="text-xs text-muted-foreground mt-1">XP earned</p>
+              <div className="text-2xl font-bold text-white">{xpValue}</div>
+              <p className="text-xs text-white/60 mt-1">XP earned</p>
             </CardContent>
           </Card>
 
-          <Card data-testid="stat-referrals">
+          <Card className="glass glass-hover rounded-3xl" data-testid="stat-referrals">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Referrals</CardTitle>
+              <CardTitle className="text-sm font-bold text-white">Referrals</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{loadingReferrals ? '...' : referralCount}</div>
-              <p className="text-xs text-muted-foreground mt-1">Friends referred</p>
+              <div className="text-2xl font-bold text-white">{loadingReferrals ? '...' : referralCount}</div>
+              <p className="text-xs text-white/60 mt-1">Friends referred</p>
             </CardContent>
           </Card>
         </div>

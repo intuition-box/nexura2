@@ -48,12 +48,12 @@ export default function Leaderboard() {
 
   if (loading) return (
     <AuthGuard>
-      <div className="min-h-screen bg-background overflow-auto p-6">
+      <div className="min-h-screen bg-black text-white overflow-auto p-6">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6 gradient-text">Leaderboard</h1>
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-6">Leaderboard</h1>
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading leaderboard...</p>
+            <p className="text-white/60">Loading leaderboard...</p>
           </div>
         </div>
       </div>
@@ -62,10 +62,10 @@ export default function Leaderboard() {
   
   if (error) return (
     <AuthGuard>
-      <div className="min-h-screen bg-background overflow-auto p-6">
+      <div className="min-h-screen bg-black text-white overflow-auto p-6">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6 gradient-text">Leaderboard</h1>
-          <div className="p-6 text-center text-muted-foreground">Error loading leaderboard: {error}</div>
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-6">Leaderboard</h1>
+          <div className="p-6 text-center text-white/60">Error loading leaderboard: {error}</div>
         </div>
       </div>
     </AuthGuard>
@@ -73,10 +73,10 @@ export default function Leaderboard() {
   
   if (!list || list.length === 0) return (
     <AuthGuard>
-      <div className="min-h-screen bg-background overflow-auto p-6">
+      <div className="min-h-screen bg-black text-white overflow-auto p-6">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6 gradient-text">Leaderboard</h1>
-          <div className="p-6 text-center text-muted-foreground">No leaderboard data yet. Complete quests to get on the board!</div>
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-6">Leaderboard</h1>
+          <div className="p-6 text-center text-white/60">No leaderboard data yet. Complete quests to get on the board!</div>
         </div>
       </div>
     </AuthGuard>
@@ -84,11 +84,11 @@ export default function Leaderboard() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background overflow-auto p-6">
+      <div className="min-h-screen bg-black text-white overflow-auto p-6">
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold gradient-text neon-glow">Leaderboard</h1>
-            <Badge variant="outline" className="text-sm">{list.length} Players</Badge>
+            <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white">Leaderboard</h1>
+            <Badge variant="outline" className="text-sm border-white/20 text-white">{list.length} Players</Badge>
           </div>
           
           <div className="space-y-3">
@@ -98,14 +98,14 @@ export default function Leaderboard() {
               const rankColors = ['#FFD700', '#C0C0C0', '#CD7F32']; // Gold, Silver, Bronze
               
               return (
-                <Card key={entry.id} className={`p-4 transition-all hover:scale-[1.02] ${
+                <Card key={entry.id} className={`p-4 glass glass-hover rounded-3xl transition-all ${
                   isTopThree ? 'border-2' : ''
                 }`} style={isTopThree ? { borderColor: rankColors[idx] } : {}}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div 
                         className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${
-                          isTopThree ? 'text-white' : 'bg-muted text-muted-foreground'
+                          isTopThree ? 'text-white' : 'bg-white/5 text-white/60'
                         }`}
                         style={isTopThree ? { backgroundColor: rankColors[idx] } : {}}
                       >
@@ -120,22 +120,22 @@ export default function Leaderboard() {
                       
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-lg">{displayName}</h3>
+                          <h3 className="font-semibold text-lg text-white">{displayName}</h3>
                           <Badge 
                             className="text-xs bg-gradient-to-r from-purple-700 via-blue-600 to-cyan-500 text-white border-0"
                           >
                             Lvl {entry.level || 1}
                           </Badge>
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-sm text-white/50">
                           {entry.quests_completed || 0} quests · {entry.tasks_completed || 0} tasks
                         </div>
                       </div>
                     </div>
                     
                     <div className="text-right">
-                      <div className="text-2xl font-bold gradient-text">{entry.xp || 0}</div>
-                      <div className="text-xs text-muted-foreground">XP</div>
+                      <div className="text-2xl font-bold text-white">{entry.xp || 0}</div>
+                      <div className="text-xs text-white/50">XP</div>
                     </div>
                   </div>
                 </Card>

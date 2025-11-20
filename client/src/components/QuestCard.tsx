@@ -51,25 +51,26 @@ export default function QuestCard({
 
   return (
     <Card 
-      className="overflow-hidden hover-elevate cursor-pointer group relative" 
+      className="overflow-hidden glass glass-hover cursor-pointer group relative rounded-3xl hover:-translate-y-1 transition-all duration-300" 
       onClick={handleClick}
       data-testid={`quest-card-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
+      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
       {/* Hero Image */}
       <div className="relative h-48 overflow-hidden">
         <img 
           src={heroImage} 
           alt={title}
-          className="w-full h-full object-cover transition-transform group-hover:scale-105"
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
         
         {/* Project Logo */}
-        <div className="absolute top-4 left-4">
+        <div className="absolute top-4 left-4 animate-float">
           <img 
             src={projectLogo} 
             alt={projectName}
-            className="w-12 h-12 rounded-full border-2 border-white/20"
+            className="w-12 h-12 rounded-full border-2 border-white/30 shadow-xl"
           />
         </div>
 

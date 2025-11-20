@@ -37,13 +37,13 @@ export default function ProfileBar({ userId = "user-123" }: ProfileBarProps) {
   // Level badge component (compact for header)
   const LevelBadge = () => (
     <Link href="/profile">
-      <div className="flex items-center gap-2 cursor-pointer hover-elevate p-2 rounded-lg bg-card">
-        <div className="relative w-8 h-8 rounded-md bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+      <div className="flex items-center gap-2 cursor-pointer glass glass-hover p-2 px-4 rounded-full transition-all">
+        <div className="relative w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
           <span className="text-white text-sm font-bold">{currentLevel}</span>
         </div>
         <div className="flex flex-col">
-          <span className="text-xs text-muted-foreground font-medium">Level</span>
-          <span className="text-sm font-bold text-foreground">{currentLevel}</span>
+          <span className="text-xs text-white/50 font-medium">Level</span>
+          <span className="text-sm font-bold text-white">{currentLevel}</span>
         </div>
       </div>
     </Link>
@@ -145,11 +145,11 @@ export default function ProfileBar({ userId = "user-123" }: ProfileBarProps) {
   const NetworkBadge = () => (
     <button
       onClick={handleAddNetwork}
-      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-border hover-elevate transition-all hover:border-primary"
-      title="Click to add Intuition Testnet to your wallet"
+      className="flex items-center gap-2 glass glass-hover px-4 py-2 rounded-full transition-all cursor-pointer"
+      title="Add Intuition Testnet to wallet"
     >
       <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-      <span className="text-sm font-medium">Intuition Testnet</span>
+      <span className="text-sm font-medium text-white">Intuition Testnet</span>
     </button>
   );
 
@@ -181,8 +181,8 @@ export default function ProfileBar({ userId = "user-123" }: ProfileBarProps) {
                 </div>
               </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-64 p-2" align="end" data-testid="profile-dropdown-menu">
-                <DropdownMenuItem className="cursor-default p-3 text-base">
+            <DropdownMenuContent className="w-64 p-2 glass rounded-3xl border-white/10" align="end" data-testid="profile-dropdown-menu">
+                <DropdownMenuItem className="cursor-default p-3 text-base text-white">
                   <span>{address ? `${address.slice(0,6)}...${address.slice(-4)}` : 'No wallet connected'}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -214,8 +214,8 @@ export default function ProfileBar({ userId = "user-123" }: ProfileBarProps) {
               {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Profile"}
             </Button>
           </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 p-2">
-            <DropdownMenuItem className="cursor-default p-2 text-base">
+            <DropdownMenuContent align="end" className="w-48 p-2 glass rounded-3xl border-white/10">
+            <DropdownMenuItem className="cursor-default p-2 text-base text-white">
               <span>{address ? `${address.slice(0,6)}...${address.slice(-4)}` : 'No wallet connected'}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />

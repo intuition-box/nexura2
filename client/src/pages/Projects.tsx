@@ -40,12 +40,12 @@ export default function Projects() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">Projects (Developer Console)</h1>
+    <div className="max-w-4xl mx-auto p-6 bg-black text-white min-h-screen">
+      <h1 className="text-3xl font-bold mb-4 text-white">Projects (Developer Console)</h1>
 
       {!isConnected ? (
         <div className="space-y-4">
-          <p className="text-muted-foreground">Connect your wallet to create and manage projects.</p>
+          <p className="text-white/60">Connect your wallet to create and manage projects.</p>
           <div className="flex gap-2">
             <Button onClick={async () => {
               const ok = await connectWallet({ noReload: true });
@@ -71,7 +71,7 @@ export default function Projects() {
         </div>
       ) : (
         <div className="space-y-6">
-          <p className="text-sm text-muted-foreground">Connected as <code>{address}</code></p>
+          <p className="text-sm text-white/60">Connected as <code className="text-white">{address}</code></p>
 
           <div className="flex gap-2">
             {/* Allow explicit project sign-in (upsert project account) even when wallet is connected */}
@@ -80,13 +80,13 @@ export default function Projects() {
 
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Project Title</label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
+              <label className="block text-sm font-bold text-white mb-1">Project Title</label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} required className="glass border-white/10 text-white" />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Description</label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} required />
+              <label className="block text-sm font-bold text-white mb-1">Description</label>
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} required className="glass border-white/10 text-white" />
             </div>
 
             <div className="flex items-center gap-2">

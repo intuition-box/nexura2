@@ -54,6 +54,17 @@ app.use("/attached_assets", express.static(path.resolve(import.meta.dirname, "..
   try {
     const server = await registerRoutes(app);
 
+    // Seed tasks on server start (in development)
+    if (app.get("env") === "development") {
+      try {
+        const { seedTasks } = await import("./seedTasks");
+        await seedTasks();
+        log("✓ Tasks seeded successfully");
+      } catch (error) {
+        log("⚠ Failed to seed tasks:", error);
+      }
+    }
+
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";

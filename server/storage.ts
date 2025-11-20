@@ -51,9 +51,25 @@ export interface IStorage {
   isQuestCompleted(userId: string, questId: string): Promise<boolean>;
   recordQuestCompletion(userId: string, questId: string, xpAwarded: number): Promise<void>;
   getUserCompletedQuests(userId: string): Promise<string[]>;
+  // Task management
+  createTask(task: any): Promise<any>;
+  getTaskById(taskId: string): Promise<any | undefined>;
+  getAllTasks(taskType?: string): Promise<any[]>;
+  isTaskCompleted(userId: string, taskId: string): Promise<boolean>;
+  recordTaskCompletion(userId: string, taskId: string, xpAwarded: number): Promise<void>;
+  getUserCompletedTasks(userId: string): Promise<string[]>;
   // Campaign methods
   getAllCampaigns(): Promise<any[]>;
   getCampaignById(id: string): Promise<any | undefined>;
+  // Campaign task methods
+  createCampaignTask(task: any): Promise<any>;
+  getCampaignTask(taskId: string): Promise<any | undefined>;
+  getCampaignTasks(campaignId: string): Promise<any[]>;
+  updateCampaignTask(taskId: string, updates: any): Promise<void>;
+  deleteCampaignTask(taskId: string): Promise<void>;
+  isCampaignTaskCompleted(userId: string, taskId: string): Promise<boolean>;
+  recordCampaignTaskCompletion(userId: string, taskId: string, campaignId: string, xpAwarded: number, verificationData?: any): Promise<void>;
+  getUserCampaignTaskCompletions(userId: string, campaignId?: string): Promise<string[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -64,6 +80,10 @@ export class MemStorage implements IStorage {
   private referralClaims: Map<string, ReferralClaim>;
   private oauthTokens: Map<string, any>;
   private questCompletions: Map<string, Set<string>>; // userId -> Set of questIds
+  private tasks: Map<string, any>; // taskId -> task
+  private taskCompletions: Map<string, Set<string>>; // userId -> Set of taskIds
+  private campaignTasks: Map<string, any>; // taskId -> campaign task
+  private campaignTaskCompletions: Map<string, Set<string>>; // userId -> Set of campaign taskIds
 
   constructor() {
     this.users = new Map();
@@ -71,8 +91,12 @@ export class MemStorage implements IStorage {
     this.levelNfts = new Map();
     this.referralEvents = new Map();
     this.referralClaims = new Map();
-  this.oauthTokens = new Map();
+    this.oauthTokens = new Map();
     this.questCompletions = new Map();
+    this.tasks = new Map();
+    this.taskCompletions = new Map();
+    this.campaignTasks = new Map();
+    this.campaignTaskCompletions = new Map();
     
     // Seed test data
     this.seedTestData();
@@ -310,7 +334,7 @@ export class MemStorage implements IStorage {
     const tasksCompleted = (current.tasksCompleted || 0) + (options?.tasksCompletedInc || 0);
     const updated = { ...current, xp: newXp, level: newLevel, questsCompleted, tasksCompleted };
     this.userProfiles.set(userId, updated);
-    console.log(`[MemStorage] addXpToUser userId=${userId} xpAmount=${xpAmount} prevXp=${current.xp||0} newXp=${newXp} prevLevel=${prevLevel} newLevel=${newLevel}`);
+    console.log(`[MemStorage] addXpToUser userId=${userId} xpAmount=${xpAmount} prevXp=${current.xp||0} newXp=${newXp} prevLevel=${prevLevel} newLevel=${newLevel} questsCompleted=${questsCompleted} tasksCompleted=${tasksCompleted} (increments: +${options?.questsCompletedInc || 0} quests, +${options?.tasksCompletedInc || 0} tasks)`);
     // persist to disk
     try {
       const dataDir = path.resolve(process.cwd(), "server", "data");
@@ -532,6 +556,140 @@ export class MemStorage implements IStorage {
       }
     }
     return undefined;
+  }
+
+  async createTask(task: any): Promise<any> {
+    this.tasks.set(task.id, task);
+    return task;
+  }
+
+  async getTaskById(taskId: string): Promise<any | undefined> {
+    return this.tasks.get(taskId);
+  }
+
+  async getAllTasks(taskType?: string): Promise<any[]> {
+    const allTasks = Array.from(this.tasks.values());
+    if (taskType) {
+      return allTasks.filter(t => t.taskType === taskType && t.isActive);
+    }
+    return allTasks.filter(t => t.isActive);
+  }
+
+  async isTaskCompleted(userId: string, taskId: string): Promise<boolean> {
+    const completedTasks = this.taskCompletions.get(userId);
+    return completedTasks ? completedTasks.has(taskId) : false;
+  }
+
+  async recordTaskCompletion(userId: string, taskId: string, xpAwarded: number): Promise<void> {
+    let completedTasks = this.taskCompletions.get(userId);
+    if (!completedTasks) {
+      completedTasks = new Set<string>();
+      this.taskCompletions.set(userId, completedTasks);
+    }
+    
+    // Check if already completed - throw error for duplicate
+    if (completedTasks.has(taskId)) {
+      const error = new Error(`Task ${taskId} already completed by user ${userId}`);
+      (error as any).code = 'DUPLICATE_TASK_COMPLETION';
+      throw error;
+    }
+    
+    completedTasks.add(taskId);
+    
+    // Persist to disk
+    try {
+      const dataDir = path.resolve(process.cwd(), "server", "data");
+      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+      const filePath = path.join(dataDir, "task_completions.json");
+      const obj: Record<string, string[]> = {};
+      this.taskCompletions.forEach((tasks, uid) => { 
+        obj[uid] = Array.from(tasks); 
+      });
+      fs.writeFileSync(filePath, JSON.stringify(obj, null, 2), "utf8");
+    } catch (e) {
+      console.warn("failed to persist task completions", e);
+    }
+  }
+
+  async getUserCompletedTasks(userId: string): Promise<string[]> {
+    const completedTasks = this.taskCompletions.get(userId);
+    return completedTasks ? Array.from(completedTasks) : [];
+  }
+
+  // Campaign task methods for MemStorage
+  async createCampaignTask(task: any): Promise<any> {
+    const id = task.id || randomUUID();
+    const fullTask = {
+      ...task,
+      id,
+      createdAt: new Date(),
+      updatedAt: null,
+    };
+    this.campaignTasks.set(id, fullTask);
+    return fullTask;
+  }
+
+  async getCampaignTask(taskId: string): Promise<any | undefined> {
+    return this.campaignTasks.get(taskId);
+  }
+
+  async getCampaignTasks(campaignId: string): Promise<any[]> {
+    return Array.from(this.campaignTasks.values())
+      .filter(t => t.campaignId === campaignId && t.isActive !== 0)
+      .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+  }
+
+  async updateCampaignTask(taskId: string, updates: any): Promise<void> {
+    const task = this.campaignTasks.get(taskId);
+    if (!task) return;
+    Object.assign(task, updates, { updatedAt: new Date() });
+    this.campaignTasks.set(taskId, task);
+  }
+
+  async deleteCampaignTask(taskId: string): Promise<void> {
+    const task = this.campaignTasks.get(taskId);
+    if (task) {
+      task.isActive = 0;
+      task.updatedAt = new Date();
+      this.campaignTasks.set(taskId, task);
+    }
+  }
+
+  async isCampaignTaskCompleted(userId: string, taskId: string): Promise<boolean> {
+    const completedTasks = this.campaignTaskCompletions.get(userId);
+    return completedTasks ? completedTasks.has(taskId) : false;
+  }
+
+  async recordCampaignTaskCompletion(userId: string, taskId: string, campaignId: string, xpAwarded: number, verificationData?: any): Promise<void> {
+    let completedTasks = this.campaignTaskCompletions.get(userId);
+    if (!completedTasks) {
+      completedTasks = new Set<string>();
+      this.campaignTaskCompletions.set(userId, completedTasks);
+    }
+    
+    if (completedTasks.has(taskId)) {
+      const error = new Error(`Campaign task ${taskId} already completed by user ${userId}`);
+      (error as any).code = 'DUPLICATE_CAMPAIGN_TASK_COMPLETION';
+      throw error;
+    }
+    
+    completedTasks.add(taskId);
+  }
+
+  async getUserCampaignTaskCompletions(userId: string, campaignId?: string): Promise<string[]> {
+    const completedTasks = this.campaignTaskCompletions.get(userId);
+    if (!completedTasks) return [];
+    
+    if (campaignId) {
+      // Filter by campaign ID
+      const taskIds = Array.from(completedTasks);
+      return taskIds.filter(tid => {
+        const task = this.campaignTasks.get(tid);
+        return task && task.campaignId === campaignId;
+      });
+    }
+    
+    return Array.from(completedTasks);
   }
 }
 
@@ -848,6 +1006,132 @@ class NeonStorage implements IStorage {
       console.warn('[NeonStorage] getCampaignById error', e);
       return undefined;
     }
+  }
+
+  // Campaign task methods
+  async createCampaignTask(task: any): Promise<any> {
+    const id = task.id || randomUUID();
+    const sql = `
+      INSERT INTO campaign_tasks 
+      (id, campaign_id, project_id, title, description, task_category, task_subtype, xp_reward, verification_config, is_active, order_index, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+      RETURNING *
+    `;
+    const values = [
+      id,
+      task.campaignId,
+      task.projectId,
+      task.title,
+      task.description,
+      task.taskCategory,
+      task.taskSubtype,
+      task.xpReward || 0,
+      typeof task.verificationConfig === 'string' ? task.verificationConfig : JSON.stringify(task.verificationConfig || {}),
+      task.isActive !== undefined ? (task.isActive ? 1 : 0) : 1,
+      task.orderIndex || 0,
+    ];
+    const r = await this.query(sql, values);
+    return r.rows[0];
+  }
+
+  async getCampaignTask(taskId: string): Promise<any | undefined> {
+    const r = await this.query(`SELECT * FROM campaign_tasks WHERE id = $1 LIMIT 1`, [taskId]);
+    return r?.rows?.[0] || undefined;
+  }
+
+  async getCampaignTasks(campaignId: string): Promise<any[]> {
+    const r = await this.query(
+      `SELECT * FROM campaign_tasks WHERE campaign_id = $1 AND is_active = 1 ORDER BY order_index ASC, created_at ASC`,
+      [campaignId]
+    );
+    return r?.rows || [];
+  }
+
+  async updateCampaignTask(taskId: string, updates: any): Promise<void> {
+    const fields: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (updates.title !== undefined) {
+      fields.push(`title = $${paramIndex++}`);
+      values.push(updates.title);
+    }
+    if (updates.description !== undefined) {
+      fields.push(`description = $${paramIndex++}`);
+      values.push(updates.description);
+    }
+    if (updates.xpReward !== undefined) {
+      fields.push(`xp_reward = $${paramIndex++}`);
+      values.push(updates.xpReward);
+    }
+    if (updates.verificationConfig !== undefined) {
+      fields.push(`verification_config = $${paramIndex++}`);
+      values.push(typeof updates.verificationConfig === 'string' ? updates.verificationConfig : JSON.stringify(updates.verificationConfig));
+    }
+    if (updates.isActive !== undefined) {
+      fields.push(`is_active = $${paramIndex++}`);
+      values.push(updates.isActive ? 1 : 0);
+    }
+    if (updates.orderIndex !== undefined) {
+      fields.push(`order_index = $${paramIndex++}`);
+      values.push(updates.orderIndex);
+    }
+
+    if (fields.length === 0) return;
+
+    fields.push(`updated_at = NOW()`);
+    values.push(taskId);
+
+    const sql = `UPDATE campaign_tasks SET ${fields.join(', ')} WHERE id = $${paramIndex}`;
+    await this.query(sql, values);
+  }
+
+  async deleteCampaignTask(taskId: string): Promise<void> {
+    await this.query(`UPDATE campaign_tasks SET is_active = 0 WHERE id = $1`, [taskId]);
+  }
+
+  async isCampaignTaskCompleted(userId: string, taskId: string): Promise<boolean> {
+    const r = await this.query(
+      `SELECT 1 FROM campaign_task_completions WHERE user_id = $1 AND task_id = $2 LIMIT 1`,
+      [userId, taskId]
+    );
+    return (r?.rows?.length || 0) > 0;
+  }
+
+  async recordCampaignTaskCompletion(userId: string, taskId: string, campaignId: string, xpAwarded: number, verificationData?: any): Promise<void> {
+    const id = randomUUID();
+    const sql = `
+      INSERT INTO campaign_task_completions 
+      (id, user_id, task_id, campaign_id, xp_awarded, verification_data, completed_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW())
+    `;
+    const values = [
+      id,
+      userId,
+      taskId,
+      campaignId,
+      xpAwarded,
+      typeof verificationData === 'string' ? verificationData : JSON.stringify(verificationData || {}),
+    ];
+    try {
+      await this.query(sql, values);
+    } catch (e: any) {
+      if (e?.code === '23505' || e?.message?.includes('unique')) {
+        const err = new Error('Task already completed');
+        (err as any).code = 'DUPLICATE_CAMPAIGN_TASK_COMPLETION';
+        throw err;
+      }
+      throw e;
+    }
+  }
+
+  async getUserCampaignTaskCompletions(userId: string, campaignId?: string): Promise<string[]> {
+    const sql = campaignId
+      ? `SELECT task_id FROM campaign_task_completions WHERE user_id = $1 AND campaign_id = $2`
+      : `SELECT task_id FROM campaign_task_completions WHERE user_id = $1`;
+    const values = campaignId ? [userId, campaignId] : [userId];
+    const r = await this.query(sql, values);
+    return (r?.rows || []).map((row: any) => row.task_id);
   }
 }
 

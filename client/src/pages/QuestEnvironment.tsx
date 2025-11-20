@@ -81,22 +81,22 @@ export default function QuestEnvironment() {
         {questData ? (
           <>
             {/* Quest Header */}
-            <Card>
+            <Card className="glass glass-hover rounded-3xl">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="space-y-2">
-                    <div className="text-sm text-muted-foreground">{questData.type}</div>
-                    <CardTitle className="text-2xl">{questData.title}</CardTitle>
-                    <p className="text-muted-foreground">{questData.description}</p>
+                    <div className="text-sm text-white/60">{questData.type}</div>
+                    <CardTitle className="text-2xl text-white">{questData.title}</CardTitle>
+                    <p className="text-white/60">{questData.description}</p>
                   </div>
                   <div className="text-right">
-                    <div className="flex items-center space-x-2 text-sm text-muted-foreground mb-2">
+                    <div className="flex items-center space-x-2 text-sm text-white/60 mb-2">
                       <Clock className="w-4 h-4" />
                       <span>{questData.timeLeft} left</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Trophy className="w-5 h-5 text-yellow-500" />
-                      <span className="font-semibold text-lg">{questData.reward}</span>
+                      <span className="font-bold text-lg text-white">{questData.reward}</span>
                     </div>
                   </div>
                 </div>
@@ -104,13 +104,13 @@ export default function QuestEnvironment() {
             </Card>
 
             {/* Quest Content Area */}
-            <Card className="min-h-[400px]">
+            <Card className="glass glass-hover rounded-3xl min-h-[400px]">
               <CardContent className="p-8">
                 <div className="text-center space-y-6">
-                  <Target className="w-16 h-16 mx-auto text-muted-foreground" />
+                  <Target className="w-16 h-16 mx-auto text-white/60" />
                   <div className="space-y-2">
-                    <h2 className="text-2xl font-bold text-muted-foreground">NOTHING HERE YET</h2>
-                    <p className="text-muted-foreground max-w-md mx-auto">
+                    <h2 className="text-2xl font-bold text-white">NOTHING HERE YET</h2>
+                    <p className="text-white/60 max-w-md mx-auto">
                       Quest content and interactions will be implemented here. 
                       This is where users will complete their quest objectives.
                     </p>
@@ -125,13 +125,13 @@ export default function QuestEnvironment() {
             </Card>
           </>
         ) : (
-          <Card className="min-h-[400px]">
+          <Card className="glass glass-hover rounded-3xl min-h-[400px]">
             <CardContent className="p-8">
               <div className="text-center space-y-6">
-                <Target className="w-16 h-16 mx-auto text-muted-foreground" />
+                <Target className="w-16 h-16 mx-auto text-white/60" />
                 <div className="space-y-2">
-                  <h2 className="text-2xl font-bold text-muted-foreground">QUEST NOT FOUND</h2>
-                  <p className="text-muted-foreground max-w-md mx-auto">
+                  <h2 className="text-2xl font-bold text-white">QUEST NOT FOUND</h2>
+                  <p className="text-white/60 max-w-md mx-auto">
                     The quest you're looking for doesn't exist or has been removed.
                   </p>
                 </div>

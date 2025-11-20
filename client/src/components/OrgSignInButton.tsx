@@ -60,9 +60,10 @@ export default function OrgSignInButton() {
 
   return (
     <>
-      <div className="fixed left-4 bottom-4 z-50">
+      <div className="fixed left-4 bottom-4 z-50 flex flex-col items-start gap-2">
+        <p className="text-xs text-white/60">Are you an Organization?</p>
         <Button size="sm" className="whitespace-nowrap" onClick={start}>
-          Are you an Organization? Create / Sign In
+          Sign In
         </Button>
       </div>
 

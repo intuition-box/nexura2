@@ -48,44 +48,44 @@ export default function Rewards() {
 
         {/* Earnings Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card data-testid="card-incentives">
+          <Card className="glass glass-hover rounded-3xl" data-testid="card-incentives">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Nexura Incentives</CardTitle>
+              <CardTitle className="text-sm font-bold text-white">Nexura Incentives</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Coming Soon</div>
+              <div className="text-2xl font-bold text-white">Coming Soon</div>
             </CardContent>
           </Card>
           
-          <Card data-testid="card-campaigns">
+          <Card className="glass glass-hover rounded-3xl" data-testid="card-campaigns">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Campaigns</CardTitle>
+              <CardTitle className="text-sm font-bold text-white">Campaigns</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Coming Soon</div>
+              <div className="text-2xl font-bold text-white">Coming Soon</div>
             </CardContent>
           </Card>
 
-          <Card data-testid="card-quest-earnings">
+          <Card className="glass glass-hover rounded-3xl" data-testid="card-quest-earnings">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Quest Earnings</CardTitle>
+              <CardTitle className="text-sm font-bold text-white">Quest Earnings</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Coming Soon</div>
+              <div className="text-2xl font-bold text-white">Coming Soon</div>
             </CardContent>
           </Card>
         </div>
 
         {/* Liquid Rewards Section */}
-        <Card className="p-6" data-testid="quest-earnings-section">
-          <h2 className="text-2xl font-bold text-foreground mb-4">Quest Earnings</h2>
-          <p className="text-muted-foreground mb-6">
+        <Card className="glass glass-hover rounded-3xl p-6" data-testid="quest-earnings-section">
+          <h2 className="text-2xl font-bold text-white mb-4">Quest Earnings</h2>
+          <p className="text-white/60 mb-6">
             With each quest you complete, you earn XP and rewards
           </p>
 
           {/* Reward Rate Tiers */}
           <div className="space-y-3 mb-6">
-            <div className="text-sm font-medium text-muted-foreground mb-3">Quest Earning Rate</div>
+            <div className="text-sm font-bold text-white mb-3">Quest Earning Rate</div>
             {rewardTiers.map((tier, index) => (
               <div 
                 key={index} 
@@ -109,15 +109,15 @@ export default function Rewards() {
         </Card>
 
         {/* Season Status */}
-        <Card className="p-6" data-testid="season-status">
+        <Card className="glass glass-hover rounded-3xl p-6" data-testid="season-status">
           <div className="text-center">
-            <h3 className="text-xl font-bold text-foreground mb-2">Season 1 Active</h3>
-            <p className="text-muted-foreground mb-4">
+            <h3 className="text-xl font-bold text-white mb-2">Season 1 Active</h3>
+            <p className="text-white/60 mb-4">
               Complete quests and earn rewards. Your progress is tracked automatically.
             </p>
             <div className="flex justify-center items-center space-x-4 mb-4">
-              <div className="text-3xl font-bold">0</div>
-              <div className="text-sm text-muted-foreground">Your Progress</div>
+              <div className="text-3xl font-bold text-white">0</div>
+              <div className="text-sm text-white/60">Your Progress</div>
             </div>
           </div>
         </Card>
@@ -125,26 +125,26 @@ export default function Rewards() {
         {/* User Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* League Card */}
-          <Card className="p-6" data-testid="league-card">
-            <h3 className="text-lg font-bold text-foreground mb-4">Your Tier</h3>
+          <Card className="glass glass-hover rounded-3xl p-6" data-testid="league-card">
+            <h3 className="text-lg font-bold text-white mb-4">Your Tier</h3>
             <div className="text-center py-4">
               <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-2">
                 <span className="text-white text-2xl font-bold">{tierNames[userStats.tier][0]}</span>
               </div>
-              <div className="text-xl font-bold">{tierNames[userStats.tier]}</div>
-              <div className="text-sm text-muted-foreground mt-1">Tier {userStats.tier + 1} of 4</div>
+              <div className="text-xl font-bold text-white">{tierNames[userStats.tier]}</div>
+              <div className="text-sm text-white/60 mt-1">Tier {userStats.tier + 1} of 4</div>
             </div>
           </Card>
 
           {/* Quest Progress */}
-          <Card className="p-6" data-testid="quest-progress">
-            <h3 className="text-lg font-bold text-foreground mb-4">Quest Progress</h3>
+          <Card className="glass glass-hover rounded-3xl p-6" data-testid="quest-progress">
+            <h3 className="text-lg font-bold text-white mb-4">Quest Progress</h3>
             <div className="space-y-4">
-              <div className="text-2xl font-bold">47 Quests Completed</div>
+              <div className="text-2xl font-bold text-white">47 Quests Completed</div>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Next Tier</span>
-                  <span>47 / 50 quests</span>
+                  <span className="text-white/60">Next Tier</span>
+                  <span className="text-white">47 / 50 quests</span>
                 </div>
                 <Progress 
                   value={(47 / 50) * 100} 
@@ -156,15 +156,15 @@ export default function Rewards() {
         </div>
 
         {/* Liquid Rewards Summary */}
-        <Card className="p-6" data-testid="quest-earnings-summary">
+        <Card className="glass glass-hover rounded-3xl p-6" data-testid="quest-earnings-summary">
           <div className="flex justify-between items-start mb-6">
             <div>
-              <h3 className="text-lg font-bold text-foreground">Your Quest Earnings</h3>
-              <div className="text-2xl font-bold mt-2">Coming Soon</div>
+              <h3 className="text-lg font-bold text-white">Your Quest Earnings</h3>
+              <div className="text-2xl font-bold text-white mt-2">Coming Soon</div>
             </div>
             <div className="text-right">
-              <div className="text-sm text-muted-foreground">Quest Earning Rate</div>
-              <div className="text-lg font-bold">{userStats.liquidRewardRate}%</div>
+              <div className="text-sm text-white/60">Quest Earning Rate</div>
+              <div className="text-lg font-bold text-white">{userStats.liquidRewardRate}%</div>
             </div>
           </div>
 

@@ -16,6 +16,9 @@ import gettingStartedImg from "@assets/generated_images/Getting_Started_Quest_Im
 export default function Quests() {
   const [activeTab, setActiveTab] = useState("daily");
   const [, setLocation] = useLocation();
+  const { user, loading } = useAuth();
+  const { toast } = useToast();
+  
   const [claimedTasks, setClaimedTasks] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem('nexura:quests:claimed');
@@ -48,6 +51,7 @@ export default function Quests() {
       title: "Verify Your Identity",
       description: "Complete your identity verification process",
       reward: "50 XP",
+      xp: 50,
       completed: false,
       metrics: { tasks: 1 }
     },
@@ -56,6 +60,7 @@ export default function Quests() {
       title: "Join Community Discussion",
       description: "Participate in at least one community discussion",
       reward: "50 XP",
+      xp: 50,
       completed: false,
       metrics: { tasks: 1 }
     },
@@ -64,6 +69,7 @@ export default function Quests() {
       title: "Share Intuition Project",
       description: "Share an Intuition project with the community",
       reward: "50 XP",
+      xp: 50,
       completed: false,
       metrics: { tasks: 1 }
     },
@@ -72,6 +78,7 @@ export default function Quests() {
       title: "Create an Attestation",
       description: "Make your first attestation on the Intuition platform",
       reward: "50 XP",
+      xp: 50,
       completed: false,
       metrics: { tasks: 1 }
     }
@@ -85,6 +92,7 @@ export default function Quests() {
       reward: "50 XP",
       kind: 'external',
       url: 'https://x.com/your_x_account',
+      xp: 50,
       actionLabel: 'Follow',
       metrics: { quests: 1 }
     },
@@ -96,6 +104,7 @@ export default function Quests() {
       kind: 'external',
       url: 'https://x.com/your_x_account/status/your_tweet_id',
       targetTweetId: 'your_tweet_id',
+      xp: 50,
       actionLabel: 'Like',
       metrics: { quests: 1 }
     },
@@ -107,6 +116,7 @@ export default function Quests() {
       kind: 'external',
       url: 'https://x.com/your_x_account/status/your_tweet_id',
       targetTweetId: 'your_tweet_id',
+      xp: 50,
       actionLabel: 'Retweet',
       metrics: { quests: 1 }
     },
@@ -116,6 +126,7 @@ export default function Quests() {
       description: "Link your X account to verify your identity and join the community",
       reward: "50 XP",
       kind: 'connect-x',
+      xp: 50,
       actionLabel: 'Connect X',
       metrics: { quests: 1 }
     },
@@ -125,6 +136,7 @@ export default function Quests() {
       description: "Connect your Discord to access special channels",
       reward: "50 XP",
       kind: 'connect-discord',
+      xp: 50,
       actionLabel: 'Connect Discord',
       metrics: { quests: 1 }
     },
@@ -135,6 +147,7 @@ export default function Quests() {
       reward: "50 XP",
       kind: 'external',
       url: 'https://discord.gg/your_invite_code',
+      xp: 50,
       actionLabel: 'Join Discord',
       metrics: { quests: 1 }
     }
@@ -478,9 +491,9 @@ export default function Quests() {
           </div>
           <div className="text-right">
             <div className="font-semibold text-foreground">
-              <span className="text-blue-500 font-bold">5XP</span>
-              <span className="text-muted-foreground mx-1">+</span>
-              <span>{quest.reward}</span>
+              <span className="text-blue-500 font-bold">
+                {typeof quest.xp === 'number' ? `+${quest.xp} XP` : quest.reward}
+              </span>
             </div>
           </div>
         </div>
@@ -497,9 +510,6 @@ export default function Quests() {
       </CardContent>
     </Card>
   );
-
-  const { user, loading } = useAuth();
-  const { toast } = useToast();
 
   // React to profile reset: if all progress metrics are zero, clear claimedTasks.
   useEffect(() => {

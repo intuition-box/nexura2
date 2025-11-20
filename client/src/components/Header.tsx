@@ -20,15 +20,15 @@ export default function Header() {
   };
 
   return (
-    <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50" data-testid="header-main">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+    <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4 transition-all duration-300" data-testid="header-main">
+      <div className="max-w-7xl mx-auto glass rounded-full px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center justify-between w-full">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-3" data-testid="link-home">
             <div className="w-10 h-10 rounded-lg overflow-hidden bg-gradient-to-br from-primary to-accent flex items-center justify-center btn-float">
               <img src={siteLogo} alt="Nexura" className="w-7 h-7" />
             </div>
-            <span className="text-xl md:text-2xl font-extrabold tracking-tight text-foreground whitespace-nowrap">NEXURA</span>
+            <span className="text-xl md:text-2xl font-bold tracking-tighter text-white whitespace-nowrap">NEXURA</span>
           </Link>
 
           {/* Navigation */}

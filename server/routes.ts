@@ -551,6 +551,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update user profile (display name, avatar, etc.)
+  app.post("/api/upload/avatar", async (req, res) => {
+    try {
+      const sess = getSessionFromReq(req);
+      if (!sess?.session) return res.status(401).json({ error: "not authenticated" });
+      
+      const { imageData, fileName } = req.body || {};
+      if (!imageData || typeof imageData !== "string") {
+        return res.status(400).json({ error: "imageData required as base64 or data URL" });
+      }
+      
+      return res.json({ success: true, url: imageData });
+    } catch (e) {
+      console.error("/api/upload/avatar error", e);
+      return res.status(500).json({ error: "upload failed" });
+    }
+  });
+
   app.put("/api/users/profile", async (req, res) => {
     try {
       const cookieHeader = String(req.headers.cookie || "");
@@ -567,17 +584,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { displayName, avatar, socialProfiles } = req.body || {};
       
-      // Get current profile to preserve existing avatar
       const currentProfile = await storage.getUserProfile(user.id);
       
-      // Update user profile
       await storage.updateUserProfile(user.id, {
         displayName: displayName || user.username,
         avatar: avatar || currentProfile?.avatar || null,
         socialProfiles: socialProfiles || {}
       });
 
-      // Return updated user data
       const updatedUser = await storage.getUser(user.id);
       return res.json({ success: true, user: updatedUser });
     } catch (e) {
@@ -676,6 +690,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Task management endpoints
+  app.get("/api/tasks", async (req, res) => {
+    try {
+      const { type } = req.query;
+      const tasks = await storage.getAllTasks(type as string);
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  app.get("/api/tasks/completed/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const completedTaskIds = await storage.getUserCompletedTasks(userId);
+      res.json({ completedTasks: completedTaskIds });
+    } catch (error) {
+      console.error("Error fetching completed tasks:", error);
+      res.status(500).json({ error: "Failed to fetch completed tasks" });
+    }
+  });
+
+  app.post("/api/tasks/claim", async (req, res) => {
+    try {
+      const { userId, taskId } = req.body || {};
+      console.log(`/api/tasks/claim called with`, { userId, taskId });
+      
+      if (!userId || !taskId) {
+        return res.status(400).json({ error: "userId and taskId required" });
+      }
+
+      // Check if task exists
+      const task = await storage.getTaskById(taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      // Check if already completed
+      const alreadyCompleted = await storage.isTaskCompleted(userId, taskId);
+      if (alreadyCompleted) {
+        console.log(`[/api/tasks/claim] Task ${taskId} already completed by user ${userId}`);
+        return res.status(409).json({ 
+          error: "Task already completed",
+          message: "You have already claimed this task."
+        });
+      }
+
+      // Record completion BEFORE awarding XP to prevent race conditions
+      try {
+        await storage.recordTaskCompletion(userId, taskId, task.xpReward);
+        console.log(`[/api/tasks/claim] Recorded completion of task ${taskId} for user ${userId}`);
+      } catch (e: any) {
+        // If this fails due to duplicate (concurrent request), return 409
+        const isDuplicate = 
+          e?.code === 'DUPLICATE_TASK_COMPLETION' ||
+          e?.code === '23505' ||
+          e?.message?.includes('duplicate');
+        
+        if (isDuplicate) {
+          console.log(`[/api/tasks/claim] Duplicate task completion detected for ${taskId} by user ${userId}`);
+          return res.status(409).json({ 
+            error: "Task already completed",
+            message: "You have already claimed this task."
+          });
+        }
+        console.error(`[/api/tasks/claim] Failed to record task completion:`, e);
+        return res.status(500).json({ error: "Failed to record task completion" });
+      }
+
+      // Award XP with proper quest/task counters
+      const result = await storage.addXpToUser(userId, task.xpReward, {
+        questsCompletedInc: task.questIncrement || 0,
+        tasksCompletedInc: task.taskIncrement || 0,
+      });
+      console.log(`/api/tasks/claim result for userId=${userId}:`, result);
+
+      // Handle level-up NFT minting
+      if (result.newLevel > result.previousLevel) {
+        const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+        const level = result.newLevel;
+        const user = await storage.getUser(userId);
+        const address = (user as any)?.address || null;
+        await storage.createOrGetLevelNftRecord({ userId, level, status: "queued", jobId });
+        if (address) {
+          const { enqueueMint } = await import("./mintWorker");
+          enqueueMint({ jobId, userId, level, address });
+        }
+      }
+
+      return res.json({ 
+        success: true, 
+        result,
+        task: {
+          id: task.id,
+          title: task.title,
+          xpReward: task.xpReward
+        }
+      });
+    } catch (err) {
+      console.error("task claim error", err);
+      return res.status(500).json({ error: "failed to claim task" });
+    }
+  });
+
   // Request server to mint level badge for a user/level (idempotent)
   app.post("/api/tiers/mint", async (req, res) => {
     try {
@@ -737,48 +856,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Leaderboard endpoint: fetch top users by XP with proper user data
   app.get("/api/leaderboard", async (req, res) => {
     try {
-      // Get top users from user profiles
       const limit = parseInt(String(req.query.limit || '100'), 10);
       
-      // Try to query from storage (works for both MemStorage and NeonStorage)
-      try {
-        // For NeonStorage, query directly
-        if ((storage as any).query) {
-          const result = await (storage as any).query(`
-            SELECT 
-              u.id,
-              u.username,
-              u.address,
-              p.display_name,
-              COALESCE(p.xp, 0) as xp,
-              COALESCE(p.level, 1) as level,
-              COALESCE(p.quests_completed, 0) as quests_completed,
-              COALESCE(p.tasks_completed, 0) as tasks_completed
-            FROM users u
-            INNER JOIN user_profiles p ON u.id = p.user_id
-            WHERE p.xp > 0
-            ORDER BY p.xp DESC, p.level DESC
-            LIMIT $1
-          `, [limit]);
-          return res.json(result.rows || []);
-        }
-        
-        // For MemStorage, get all users and sort by XP
-        const users = [] as any[];
-        
-        // Get all users with profiles and XP > 0
-        for (const [userId, profile] of (storage as any).userProfiles.entries()) {
-          if (!profile || (profile.xp || 0) <= 0) continue; // Skip users with no XP
+      if ((storage as any).pool) {
+        const result = await (storage as any).query(`
+          SELECT 
+            u.id,
+            u.username,
+            u.address,
+            p.display_name,
+            COALESCE(p.xp, 0) as xp,
+            COALESCE(p.level, 1) as level,
+            COALESCE(p.quests_completed, 0) as quests_completed,
+            COALESCE(p.tasks_completed, 0) as tasks_completed
+          FROM users u
+          LEFT JOIN user_profiles p ON u.id = p.user_id
+          WHERE COALESCE(p.xp, 0) > 0
+          ORDER BY COALESCE(p.xp, 0) DESC, COALESCE(p.level, 1) DESC
+          LIMIT $1
+        `, [limit]);
+        return res.json(result.rows || []);
+      }
+      
+      const users = [] as any[];
+      const memStorage = storage as any;
+      
+      if (memStorage.userProfiles && memStorage.userProfiles.entries) {
+        for (const [userId, profile] of memStorage.userProfiles.entries()) {
+          if (!profile || (profile.xp || 0) <= 0) continue;
           
           const user = await storage.getUser(userId);
-          if (user && profile) {
+          if (user) {
             const displayName = profile.displayName || (user as any).displayName || user.username;
             users.push({
               id: user.id,
               username: user.username,
               address: (user as any).address || null,
               display_name: displayName,
-              displayName: displayName,
               xp: profile.xp || 0,
               level: profile.level || 1,
               quests_completed: profile.questsCompleted || 0,
@@ -786,20 +900,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
         }
-        
-        // Sort by XP (descending), then by level (descending) as tiebreaker
-        users.sort((a, b) => {
-          const xpDiff = (b.xp || 0) - (a.xp || 0);
-          if (xpDiff !== 0) return xpDiff;
-          return (b.level || 1) - (a.level || 1);
-        });
-        return res.json(users.slice(0, limit));
-        
-      } catch (queryErr) {
-        console.warn('Leaderboard query error:', queryErr);
-        // Return empty array if query fails
-        return res.json([]);
       }
+      
+      users.sort((a, b) => {
+        const xpDiff = (b.xp || 0) - (a.xp || 0);
+        if (xpDiff !== 0) return xpDiff;
+        return (b.level || 1) - (a.level || 1);
+      });
+      return res.json(users.slice(0, limit));
     } catch (error) {
       console.error("Error fetching leaderboard:", error);
       res.status(500).json({ error: "Failed to fetch leaderboard" });
@@ -839,6 +947,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: "failed to fetch project" });
+    }
+  });
+
+  // Campaign Tasks API
+  app.post("/api/campaigns/:campaignId/tasks", async (req, res) => {
+    try {
+      const sess = getSessionFromReq(req);
+      if (!sess?.session) return res.status(401).json({ error: "not authenticated" });
+      
+      const { campaignId } = req.params;
+      const campaign = await storage.getCampaignById(campaignId);
+      if (!campaign) return res.status(404).json({ error: "campaign not found" });
+      
+      // TODO: Validate project ownership/permissions
+      
+      const taskData = {
+        ...req.body,
+        campaignId,
+        projectId: campaign.project_id,
+      };
+      
+      const task = await storage.createCampaignTask(taskData);
+      return res.status(201).json(task);
+    } catch (err) {
+      console.error("[POST /api/campaigns/:campaignId/tasks]", err);
+      return res.status(500).json({ error: "failed to create task" });
+    }
+  });
+
+  app.get("/api/campaigns/:campaignId/tasks", async (req, res) => {
+    try {
+      const { campaignId } = req.params;
+      const tasks = await storage.getCampaignTasks(campaignId);
+      return res.json(tasks);
+    } catch (err) {
+      console.error("[GET /api/campaigns/:campaignId/tasks]", err);
+      return res.status(500).json({ error: "failed to fetch tasks" });
+    }
+  });
+
+  app.put("/api/campaigns/:campaignId/tasks/:taskId", async (req, res) => {
+    try {
+      const sess = getSessionFromReq(req);
+      if (!sess?.session) return res.status(401).json({ error: "not authenticated" });
+      
+      const { campaignId, taskId } = req.params;
+      const task = await storage.getCampaignTask(taskId);
+      if (!task) return res.status(404).json({ error: "task not found" });
+      if (task.campaignId !== campaignId) return res.status(400).json({ error: "task does not belong to campaign" });
+      
+      // TODO: Validate project ownership/permissions
+      
+      await storage.updateCampaignTask(taskId, req.body);
+      const updated = await storage.getCampaignTask(taskId);
+      return res.json(updated);
+    } catch (err) {
+      console.error("[PUT /api/campaigns/:campaignId/tasks/:taskId]", err);
+      return res.status(500).json({ error: "failed to update task" });
+    }
+  });
+
+  app.delete("/api/campaigns/:campaignId/tasks/:taskId", async (req, res) => {
+    try {
+      const sess = getSessionFromReq(req);
+      if (!sess?.session) return res.status(401).json({ error: "not authenticated" });
+      
+      const { campaignId, taskId } = req.params;
+      const task = await storage.getCampaignTask(taskId);
+      if (!task) return res.status(404).json({ error: "task not found" });
+      if (task.campaignId !== campaignId) return res.status(400).json({ error: "task does not belong to campaign" });
+      
+      // TODO: Validate project ownership/permissions
+      
+      await storage.deleteCampaignTask(taskId);
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("[DELETE /api/campaigns/:campaignId/tasks/:taskId]", err);
+      return res.status(500).json({ error: "failed to delete task" });
+    }
+  });
+
+  app.get("/api/campaigns/:campaignId/tasks/completed/:userId", async (req, res) => {
+    try {
+      const { campaignId, userId } = req.params;
+      const completedTaskIds = await storage.getUserCampaignTaskCompletions(userId, campaignId);
+      return res.json({ taskIds: completedTaskIds });
+    } catch (err) {
+      console.error("[GET /api/campaigns/:campaignId/tasks/completed/:userId]", err);
+      return res.status(500).json({ error: "failed to fetch completions" });
+    }
+  });
+
+  app.post("/api/campaigns/:campaignId/tasks/:taskId/claim", async (req, res) => {
+    try {
+      const sess = getSessionFromReq(req);
+      if (!sess?.session) return res.status(401).json({ error: "not authenticated" });
+      
+      const { campaignId, taskId } = req.params;
+      const user = await storage.getUserByAddress(sess.session.address);
+      if (!user) return res.status(404).json({ error: "user not found" });
+      
+      const task = await storage.getCampaignTask(taskId);
+      if (!task) return res.status(404).json({ error: "task not found" });
+      if (task.campaignId !== campaignId) return res.status(400).json({ error: "task does not belong to campaign" });
+      
+      const alreadyCompleted = await storage.isCampaignTaskCompleted(user.id, taskId);
+      if (alreadyCompleted) return res.status(409).json({ error: "task already completed", code: "DUPLICATE_CAMPAIGN_TASK_COMPLETION" });
+      
+      // Record completion
+      await storage.recordCampaignTaskCompletion(user.id, taskId, campaignId, task.xpReward || 0, req.body.verificationData);
+      
+      // Award XP
+      const result = await storage.addXpToUser(user.id, task.xpReward || 0, { questsCompletedInc: 1 });
+      
+      return res.json({
+        success: true,
+        xpAwarded: task.xpReward || 0,
+        newLevel: result.newLevel,
+        newXp: result.xp,
+      });
+    } catch (err: any) {
+      if (err.code === 'DUPLICATE_CAMPAIGN_TASK_COMPLETION') {
+        return res.status(409).json({ error: "task already completed", code: err.code });
+      }
+      console.error("[POST /api/campaigns/:campaignId/tasks/:taskId/claim]", err);
+      return res.status(500).json({ error: "failed to claim task" });
     }
   });
 
