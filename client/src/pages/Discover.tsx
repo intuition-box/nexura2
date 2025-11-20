@@ -9,6 +9,7 @@ import { queryClient } from "@/lib/queryClient";
 import HeroCampaign from "@/components/HeroCampaign";
 import QuestCard from "@/components/QuestCard";
 import CampaignCard from "@/components/CampaignCard";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 // Import generated images
 import questHero1 from "@assets/generated_images/Web3_quest_hero_image_9eff8349.png";
@@ -176,12 +177,7 @@ export default function Discover() {
 
   return (
     <div className="min-h-screen bg-black text-white overflow-auto relative" data-testid="discover-page">
-      {/* Animated Background Blobs */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-blue-600/20 rounded-full blur-[120px] animate-blob mix-blend-screen" />
-        <div className="absolute top-[20%] right-[-10%] w-[40vw] h-[40vw] bg-purple-600/20 rounded-full blur-[120px] animate-blob animation-delay-2000 mix-blend-screen" />
-        <div className="absolute bottom-[-10%] left-[20%] w-[45vw] h-[45vw] bg-indigo-600/20 rounded-full blur-[120px] animate-blob animation-delay-4000 mix-blend-screen" />
-      </div>
+      <AnimatedBackground />
 
       {/* Top Bar */}
       <div className="relative z-10 flex items-center justify-between p-4 border-b border-white/10 glass">

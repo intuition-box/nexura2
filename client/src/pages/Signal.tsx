@@ -1,10 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, BarChart3 } from "lucide-react";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 export default function Signal() {
   return (
-    <div className="min-h-screen bg-black overflow-auto p-6" data-testid="signal-page">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-black text-white overflow-auto p-6 relative" data-testid="signal-page">
+      <AnimatedBackground />
+      <div className="max-w-4xl mx-auto relative z-10">
         {/* Header */}
         <div className="text-center py-12">
           <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">

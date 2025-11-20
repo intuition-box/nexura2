@@ -7,6 +7,7 @@ import { createProject } from "@/lib/remoteDb";
 import { ProjectSchema } from "@/schemas/project.schema";
 import SignUpPopup from "@/components/SignUpPopup";
 import { useLocation } from "wouter";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 export default function Projects() {
   const { isConnected, connectWallet, address } = useWallet();
@@ -40,7 +41,9 @@ export default function Projects() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-black text-white min-h-screen">
+    <div className="max-w-4xl mx-auto p-6 bg-black text-white min-h-screen relative">
+      <AnimatedBackground />
+      <div className="relative z-10">
       <h1 className="text-3xl font-bold mb-4 text-white">Projects (Developer Console)</h1>
 
       {!isConnected ? (
@@ -95,7 +98,8 @@ export default function Projects() {
             </div>
           </form>
         </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

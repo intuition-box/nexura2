@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { XP_PER_LEVEL } from "@shared/schema";
 import { Progress } from "@/components/ui/progress";
 import { emitSessionChange } from "@/lib/session";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 function WalletDropdown() {
   const { isConnected, connectWallet, address, disconnect } = useWallet();
@@ -135,7 +136,8 @@ export default function Profile() {
   }, [userData]);
 
   return (
-    <div className="min-h-screen bg-background overflow-auto p-6 scale-in" data-testid="profile-page">
+    <div className="min-h-screen bg-black text-white overflow-auto p-6 scale-in relative" data-testid="profile-page">
+      <AnimatedBackground />
       {loading && (
         <div className="fixed top-4 right-4 z-50 bg-background/80 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
           <div className="flex items-center gap-2">
@@ -144,7 +146,7 @@ export default function Profile() {
           </div>
         </div>
       )}
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-4xl mx-auto space-y-8 relative z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <h1 className="text-3xl font-bold text-white">My Profile</h1>

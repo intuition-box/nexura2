@@ -4,6 +4,7 @@ import { useRoute, Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Clock, Trophy, Target } from "lucide-react";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 export default function QuestEnvironment() {
   const [match, params] = useRoute("/quest/:questId");
@@ -63,8 +64,9 @@ export default function QuestEnvironment() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6" data-testid="quest-environment">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen bg-black text-white p-6 relative" data-testid="quest-environment">
+      <AnimatedBackground />
+      <div className="max-w-4xl mx-auto space-y-6 relative z-10">
         {/* Back Button */}
         <div className="flex items-center space-x-4">
           <Button 

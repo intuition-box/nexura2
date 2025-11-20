@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { emitSessionChange } from "@/lib/session";
 import SignUpPopup from "@/components/SignUpPopup";
+import AnimatedBackground from "@/components/AnimatedBackground";
 import dailyQuestImg from "@assets/generated_images/Daily_Quest_Completion_Image_83de888a.png";
 import gettingStartedImg from "@assets/generated_images/Getting_Started_Quest_Image_9a7ae50b.png";
 
@@ -525,8 +526,9 @@ export default function Quests() {
   }, [user, claimedTasks.length]);
 
   return (
-    <div className="min-h-screen bg-background overflow-auto p-6" data-testid="quests-page">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen bg-black text-white overflow-auto p-6 relative" data-testid="quests-page">
+      <AnimatedBackground />
+      <div className="max-w-6xl mx-auto space-y-8 relative z-10">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

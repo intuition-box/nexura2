@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/lib/auth";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 // Level achievement data
 const levelAchievements = [
@@ -37,8 +38,9 @@ export default function Achievements() {
   const userLevel = user.level ?? 0;
 
   return (
-    <div className="min-h-screen bg-background overflow-auto p-6" data-testid="achievements-page">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen bg-black text-white overflow-auto p-6 relative" data-testid="achievements-page">
+      <AnimatedBackground />
+      <div className="max-w-6xl mx-auto space-y-8 relative z-10">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Levels</h1>

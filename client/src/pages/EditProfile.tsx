@@ -13,6 +13,7 @@ import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { emitSessionChange } from "@/lib/session";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 export default function EditProfile() {
   const [, setLocation] = useLocation();
@@ -172,8 +173,9 @@ export default function EditProfile() {
   };
 
   return (
-    <div className="min-h-screen bg-background overflow-auto p-6" data-testid="edit-profile-page">
-      <div className="max-w-2xl mx-auto space-y-8">
+    <div className="min-h-screen bg-black text-white overflow-auto p-6 relative" data-testid="edit-profile-page">
+      <AnimatedBackground />
+      <div className="max-w-2xl mx-auto space-y-8 relative z-10">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">

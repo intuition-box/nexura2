@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Gift, TrendingUp, Zap } from "lucide-react";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 export default function Rewards() {
   const [userEarnings] = useState({
@@ -38,8 +39,9 @@ export default function Rewards() {
 
 
   return (
-    <div className="min-h-screen bg-background overflow-auto p-6" data-testid="rewards-page">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen bg-black text-white overflow-auto p-6 relative" data-testid="rewards-page">
+      <AnimatedBackground />
+      <div className="max-w-6xl mx-auto space-y-8 relative z-10">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Your earnings on Nexura</h1>

@@ -5,6 +5,7 @@ import { CheckCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
 import { TIER_UNLOCK_MIN_LEVEL, TIER_COLORS } from "@shared/schema";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 const TIER_LEVEL_RANGES = {
   enchanter: { min: 0, max: 5 },
@@ -100,8 +101,9 @@ export default function Tiers() {
   const userTier = useMemo(() => getUserTier(userLevel), [userLevel]);
 
   return (
-    <div className="min-h-screen bg-background overflow-auto p-6" data-testid="tiers-page">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen bg-black text-white overflow-auto p-6 relative" data-testid="tiers-page">
+      <AnimatedBackground />
+      <div className="max-w-4xl mx-auto space-y-8 relative z-10">
         {/* Header */}
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold text-foreground">Nexura Tiers</h1>

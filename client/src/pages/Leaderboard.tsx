@@ -3,6 +3,7 @@ import AuthGuard from "@/components/AuthGuard";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 type Entry = {
   id: string;
@@ -84,8 +85,9 @@ export default function Leaderboard() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-black text-white overflow-auto p-6">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <div className="min-h-screen bg-black text-white overflow-auto p-6 relative">
+        <AnimatedBackground />
+        <div className="max-w-4xl mx-auto space-y-6 relative z-10">
           <div className="flex items-center justify-between">
             <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white">Leaderboard</h1>
             <Badge variant="outline" className="text-sm border-white/20 text-white">{list.length} Players</Badge>

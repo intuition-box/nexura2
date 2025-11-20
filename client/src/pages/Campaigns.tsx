@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, Clock, Users, ExternalLink } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 interface Campaign {
   id: string;
@@ -142,8 +143,9 @@ export default function Campaigns() {
 };
 
   return (
-    <div className="min-h-screen bg-background overflow-auto p-6" data-testid="campaigns-page">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen bg-black text-white overflow-auto p-6 relative" data-testid="campaigns-page">
+      <AnimatedBackground />
+      <div className="max-w-6xl mx-auto space-y-8 relative z-10">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Campaigns</h1>

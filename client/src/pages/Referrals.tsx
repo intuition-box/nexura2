@@ -10,6 +10,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { emitSessionChange } from "@/lib/session";
 import { useAuth } from "@/lib/auth";
 import AuthGuard from "@/components/AuthGuard";
+import AnimatedBackground from "@/components/AnimatedBackground";
 import type { ReferralStats } from "@shared/schema";
 
 export default function Referrals() {
@@ -91,8 +92,9 @@ export default function Referrals() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-black text-white overflow-auto p-6" data-testid="referrals-page">
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="min-h-screen bg-black text-white overflow-auto p-6 relative" data-testid="referrals-page">
+      <AnimatedBackground />
+      <div className="max-w-4xl mx-auto space-y-8 relative z-10">
         {/* Header */}
         <div className="text-center">
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-2">Referral Program</h1>

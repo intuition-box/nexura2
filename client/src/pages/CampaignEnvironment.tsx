@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 export default function CampaignEnvironment() {
   const [, setLocation] = useLocation();
@@ -26,8 +27,9 @@ export default function CampaignEnvironment() {
   };
 
   return (
-    <div className="min-h-screen bg-black overflow-auto p-6" data-testid="campaign-environment-page">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen bg-black text-white overflow-auto p-6 relative" data-testid="campaign-environment-page">
+      <AnimatedBackground />
+      <div className="max-w-4xl mx-auto space-y-8 relative z-10">
         {/* Header Navigation */}
         <div className="flex items-center space-x-4">
           <Button 

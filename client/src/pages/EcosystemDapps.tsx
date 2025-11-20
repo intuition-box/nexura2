@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ExternalLink, Target, Star } from "lucide-react";
 import { useLocation } from "wouter";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 // Import protocol logos
 import intudexLogo from "@assets/image_1758731610569.png";
@@ -298,8 +299,9 @@ export default function EcosystemDapps() {
     : dapps.filter(dapp => dapp.category === selectedCategory);
 
   return (
-    <div className="min-h-screen bg-background overflow-auto p-6" data-testid="ecosystem-dapps-page">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-black text-white overflow-auto p-6 relative" data-testid="ecosystem-dapps-page">
+      <AnimatedBackground />
+      <div className="max-w-7xl mx-auto space-y-8 relative z-10">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Ecosystem Dapps</h1>
