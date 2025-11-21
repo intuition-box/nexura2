@@ -10,14 +10,37 @@ export function getSessionToken(): string | null {
 export function setSessionToken(token: string) {
   try {
     localStorage.setItem(KEY, token);
-    listeners.forEach((cb) => cb(token));
+    listeners.forEach((cb) => {
+      try {
+        const res = cb(token);
+        if (res && typeof (res as any).catch === "function") {
+          // handle rejected promises from async listeners
+          (res as Promise<any>).catch((e) => {
+            console.warn("session listener rejected:", e);
+          });
+        }
+      } catch (e) {
+        console.warn("session listener threw:", e);
+      }
+    });
   } catch { /* ignore */ }
 }
 
 export function clearSession() {
   try {
     localStorage.removeItem(KEY);
-    listeners.forEach((cb) => cb(null));
+    listeners.forEach((cb) => {
+      try {
+        const res = cb(null);
+        if (res && typeof (res as any).catch === "function") {
+          (res as Promise<any>).catch((e) => {
+            console.warn("session listener rejected:", e);
+          });
+        }
+      } catch (e) {
+        console.warn("session listener threw:", e);
+      }
+    });
   } catch { /* ignore */ }
 }
 
@@ -28,7 +51,18 @@ export function onSessionChange(cb: SessionChangeCb) {
 
 export function emitSessionChange() {
   const token = getSessionToken();
-  listeners.forEach((cb) => cb(token));
+  listeners.forEach((cb) => {
+    try {
+      const res = cb(token);
+      if (res && typeof (res as any).catch === "function") {
+        (res as Promise<any>).catch((e) => {
+          console.warn("session listener rejected:", e);
+        });
+      }
+    } catch (e) {
+      console.warn("session listener threw:", e);
+    }
+  });
 }
 
 export default { getSessionToken, setSessionToken, clearSession, onSessionChange };

@@ -5,6 +5,19 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import AnimatedBackground from "@/components/AnimatedBackground";
 
+// Use Vite env var if provided, otherwise fall back to the deployed backend URL.
+// `import.meta.env` may not be typed in this project, so access defensively.
+// Prefer configured Vite env var; fallback to localhost for dev instead of the deployed Render URL
+const BACKEND_BASE = ((import.meta as any).env?.VITE_BACKEND_URL as string) ||
+  "http://localhost:5051";
+
+function buildUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
+  const p = path.replace(/^\/+/, "");
+  return `${base}/${p}`;
+}
+
 type Entry = {
   id: string;
   username: string;
@@ -24,7 +37,7 @@ export default function Leaderboard() {
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    fetch("/api/leaderboard")
+    fetch(buildUrl("/api/leaderboard"))
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();

@@ -19,16 +19,26 @@ export async function initAppKit(projectId?: string) {
   // from breaking user experience during local development. Other errors pass through.
   try {
     const localOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
+    // Expand the suppression to common local/dev origins (localhost, 127.0.0.1, LAN IPs)
+    // so that AppKit's origin-authorization rejection does not spam the console during
+    // development on multiple hostnames (e.g. local LAN at 192.168.x.x).
     window.addEventListener("unhandledrejection", (ev: PromiseRejectionEvent) => {
       try {
         const reason = ev.reason as any;
         const msg = typeof reason === "string" ? reason : reason?.message ?? String(reason);
         if (typeof msg === "string" && msg.includes("has not been authorized")) {
-          // Only suppress for localhost-like origins to avoid hiding real production issues
-          if (localOrigin?.includes("localhost") || localOrigin?.includes("127.0.0.1") || localOrigin?.includes(":5051") ) {
+          const isLocalHost = !!localOrigin && (
+            localOrigin.includes("localhost") ||
+            localOrigin.includes("127.0.0.1") ||
+            localOrigin.includes(":5051") ||
+            localOrigin.includes("192.168.") ||
+            localOrigin.includes("10.") ||
+            /https?:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\./.test(localOrigin)
+          );
+          if (isLocalHost) {
             ev.preventDefault();
             // eslint-disable-next-line no-console
-            console.warn("Reown AppKit authorization error suppressed:", msg);
+            console.warn("Reown AppKit authorization error suppressed for dev origin:", msg);
           }
         }
       } catch (e) {

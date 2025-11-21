@@ -81,8 +81,41 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  // Serve index.html for all other routes but inject a runtime BACKEND URL
+  // so the client can be configured at request time without rebuilding.
+  app.use("*", (req, res) => {
+    const indexFile = path.resolve(distPath, "index.html");
+    try {
+      let html = fs.readFileSync(indexFile, "utf8");
+
+      // Determine backend URL to inject. Prefer explicit env var, otherwise
+      // derive from the incoming request origin (protocol + host).
+      // Prefer explicit env var, otherwise fall back to the user-provided API host.
+      // If neither is set, infer from the request origin.
+      const envUrl = process.env.BACKEND_URL || process.env.VITE_BACKEND_URL;
+      const inferred = `${req.protocol}://${req.get("host")}`;
+      // User-provided fallback (set to production API if desired).
+      // Prefer an inferred backend URL derived from the incoming request so
+      // static files served on the same host will talk to the correct API.
+      // Only fall back to localhost:5051 if nothing else is available.
+      const userFallback = "http://localhost:5051";
+      const backendUrl = envUrl || inferred || userFallback;
+
+      const script = `<script>window.__BACKEND_URL__ = ${JSON.stringify(
+        backendUrl,
+      )};</script>`;
+
+      // Inject before closing </head> if present, otherwise prepend.
+      if (html.includes("</head>")) {
+        html = html.replace("</head>", `${script}\n</head>`);
+      } else {
+        html = script + html;
+      }
+
+      res.status(200).set({ "Content-Type": "text/html" }).end(html);
+    } catch (e) {
+      console.error("serveStatic: failed to read/serve index.html", e);
+      res.status(500).send("Internal Server Error");
+    }
   });
 }

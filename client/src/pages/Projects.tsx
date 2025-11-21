@@ -9,6 +9,19 @@ import SignUpPopup from "@/components/SignUpPopup";
 import { useLocation } from "wouter";
 import AnimatedBackground from "@/components/AnimatedBackground";
 
+// Use Vite env var if provided, otherwise fall back to the deployed backend URL.
+// `import.meta.env` may not be typed in this project, so access defensively.
+// Prefer configured Vite env var; fallback to localhost for dev instead of the deployed Render URL
+const BACKEND_BASE = ((import.meta as any).env?.VITE_BACKEND_URL as string) ||
+  "http://localhost:5051";
+
+function buildUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
+  const p = path.replace(/^\/+/, "");
+  return `${base}/${p}`;
+}
+
 export default function Projects() {
   const { isConnected, connectWallet, address } = useWallet();
   const [, setLocation] = useLocation();
@@ -55,7 +68,7 @@ export default function Projects() {
               if (!ok) return alert("Failed to connect wallet");
               try {
                 // ask server for projects and navigate to existing project dashboard if owned
-                const res = await fetch(`/projects`, { credentials: "include" });
+                const res = await fetch(buildUrl(`/projects`));
                 if (res.ok) {
                   const list = await res.json();
                   const my = list.find((p: any) => p.ownerAddress && p.ownerAddress.toLowerCase() === (address || "").toLowerCase());

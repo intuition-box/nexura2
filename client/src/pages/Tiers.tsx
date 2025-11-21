@@ -7,6 +7,19 @@ import { toast } from "@/hooks/use-toast";
 import { TIER_UNLOCK_MIN_LEVEL, TIER_COLORS } from "@shared/schema";
 import AnimatedBackground from "@/components/AnimatedBackground";
 
+// Use Vite env var if provided, otherwise fall back to the deployed backend URL.
+// `import.meta.env` may not be typed in this project, so access defensively.
+// Prefer configured Vite env var; fallback to localhost for dev instead of the deployed Render URL
+const BACKEND_BASE = ((import.meta as any).env?.VITE_BACKEND_URL as string) ||
+  "http://localhost:5051";
+
+function buildUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
+  const p = path.replace(/^\/+/, "");
+  return `${base}/${p}`;
+}
+
 const TIER_LEVEL_RANGES = {
   enchanter: { min: 0, max: 5 },
   illuminated: { min: 5, max: 15 },
@@ -189,7 +202,7 @@ export default function Tiers() {
                               onClick={async () => {
                                 try {
                                   const levelToMint = TIER_LEVEL_RANGES[tier.key].min;
-                                  const res = await fetch('/api/tiers/mint', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, level: levelToMint }) });
+                                  const res = await fetch(buildUrl('/api/tiers/mint'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, level: levelToMint }) });
                                   const json = await res.json();
                                   if (!res.ok) throw new Error(json?.error || 'mint failed');
                                   toast({ title: 'Mint queued', description: `Job ${json.jobId}` });

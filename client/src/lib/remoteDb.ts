@@ -6,8 +6,22 @@ import { UserSchema, type User } from "@/schemas/user.schema";
 const WALLETS_BASE = import.meta.env.VITE_WALLETS_API_URL || "";
 const PROJECTS_BASE = import.meta.env.VITE_PROJECTS_API_URL || "";
 
+// Use Vite env var if provided, otherwise fall back to the deployed backend URL.
+// `import.meta.env` may not be typed in this project, so access defensively.
+// Prefer configured Vite env var; fallback to localhost for dev instead of the deployed Render URL
+const BACKEND_BASE = ((import.meta as any).env?.VITE_BACKEND_URL as string) ||
+  "http://localhost:5051";
+
+function buildUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
+  const p = path.replace(/^\/+/, "");
+  return `${base}/${p}`;
+}
+
 async function safeFetch(url: string, opts: any) {
-  const res = await fetch(url, opts);
+  const fullUrl = url.startsWith('http') ? url : buildUrl(url);
+  const res = await fetch(fullUrl, opts);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Remote DB error ${res.status}: ${text}`);
@@ -20,12 +34,7 @@ export async function createWallet(payload: Wallet) {
   // Prefer a configured wallets backend; otherwise do nothing (server-side
   // wallet provisioning happens via the /auth/wallet flow).
   if (WALLETS_BASE) {
-    return safeFetch(`${WALLETS_BASE.replace(/\/$/, "")}/wallets`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(parsed),
-      credentials: "include",
-    });
+    return safeFetch(`${WALLETS_BASE.replace(/\/$/, "")}/wallets`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(parsed) });
   }
   // No-op on client when local server handles wallet provisioning via /auth/wallet
   return null as any;
@@ -38,27 +47,25 @@ export async function requestChallenge(address: string) {
   const base = WALLETS_BASE ? WALLETS_BASE.replace(/\/$/, "") : "";
   if (base) {
     try {
-      return await safeFetch(`${base}/challenge?address=${encodeURIComponent(address)}`, { method: "GET", credentials: "include" });
+      return await safeFetch(`${base}/challenge?address=${encodeURIComponent(address)}`, { method: "GET" });
     } catch (e) {
       return await safeFetch(`${base}/challenge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address }),
-        credentials: "include",
       });
     }
   }
 
   // Local server
-  try {
-    return await safeFetch(`/challenge?address=${encodeURIComponent(address)}`, { method: "GET", credentials: "include" });
-  } catch (e) {
-    return await safeFetch(`/challenge`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ address }),
-      credentials: "include",
-    });
+    try {
+      return await safeFetch(`/challenge?address=${encodeURIComponent(address)}`, { method: "GET" });
+    } catch (e) {
+      return await safeFetch(`/challenge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+      });
   }
 }
 
@@ -69,7 +76,7 @@ export async function requestChallenge(address: string) {
 export async function listWallets() {
   // No client-side wallet index when no external backend is configured.
   if (WALLETS_BASE) {
-    return safeFetch(`${WALLETS_BASE.replace(/\/$/, "")}/wallets`, { method: "GET", credentials: "include" });
+    return safeFetch(`${WALLETS_BASE.replace(/\/$/, "")}/wallets`, { method: "GET" });
   }
   return [];
 }
@@ -80,7 +87,13 @@ export async function createUserFromWallet(payload: User) {
   // Prefer an external users backend when configured. Otherwise rely on the
   // server-side wallet auth flow which will auto-provision users on /auth/wallet.
   try {
-    const res = await fetch(`/api/me`, { method: "GET", credentials: "include" });
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+    } catch (e) { /* ignore */ }
+
+      const res = await fetch(buildUrl(`/api/me`), { method: "GET", headers });
     if (res.ok) return res.json();
   } catch (e) {
     // ignore
@@ -97,7 +110,6 @@ export async function createProject(payload: Project) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(parsed),
-      credentials: "include",
     });
   }
 
@@ -105,7 +117,6 @@ export async function createProject(payload: Project) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(parsed),
-    credentials: "include",
   });
 }
 
@@ -120,7 +131,6 @@ export async function createProjectAccount(payload: any) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      credentials: "include",
     });
   }
 
@@ -139,7 +149,6 @@ export async function createCampaign(projectId: string, campaign: any) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(campaign),
-    credentials: "include",
   });
 }
 
@@ -149,6 +158,5 @@ export async function createQuest(projectId: string, quest: any) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(quest),
-    credentials: "include",
   });
 }

@@ -23,7 +23,7 @@ export default function WalletAuthCard({ mode = "user", action = "signin" }: { m
       // Upsert account depending on mode then navigate appropriately
       if (mode === "user") {
         try {
-          const meRes = await fetch(`/api/me`, { credentials: "include" });
+          const meRes = await fetch(buildUrl(`/api/me`));
           if (meRes.ok) {
             const json = await meRes.json().catch(() => ({}));
             if (json?.hasProfile) {
@@ -47,7 +47,7 @@ export default function WalletAuthCard({ mode = "user", action = "signin" }: { m
           // ignore
         }
         try {
-          const res = await fetch(`/projects`, { credentials: "include" });
+          const res = await fetch(buildUrl(`/projects`));
           if (res.ok) {
             const list = await res.json();
             const my = list.find((p: any) => p.ownerAddress && p.ownerAddress.toLowerCase() === (connectedAddress || "").toLowerCase());

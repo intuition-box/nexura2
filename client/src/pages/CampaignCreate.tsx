@@ -4,9 +4,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { useLocation } from "wouter";
-import { Plus, X, ChevronRight, ArrowLeft } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   TASK_CATEGORIES,
   TASK_CATEGORY_LABELS,
@@ -15,8 +22,6 @@ import {
   type TaskCategory,
   type CampaignTaskData,
 } from "@shared/taskTypes";
-
-type TaskBuilderStep = "category" | "subtype" | "configure";
 
 interface TaskInProgress extends Partial<CampaignTaskData> {
   tempId: string;
@@ -35,54 +40,236 @@ export default function CampaignCreate() {
   
   // Task builder state
   const [tasks, setTasks] = useState<TaskInProgress[]>([]);
-  const [showTaskBuilder, setShowTaskBuilder] = useState(false);
-  const [builderStep, setBuilderStep] = useState<TaskBuilderStep>("category");
-  const [selectedCategory, setSelectedCategory] = useState<TaskCategory | null>(null);
-  const [selectedSubtype, setSelectedSubtype] = useState<string | null>(null);
   
-  // Current task being configured
-  const [currentTask, setCurrentTask] = useState<TaskInProgress>({
-    tempId: Date.now().toString(),
-    title: "",
-    description: "",
-    xpReward: 10,
-    verificationConfig: {},
-  });
+  // Task form state (dropdown workflow)
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<TaskCategory | "">("");
+  const [selectedSubtype, setSelectedSubtype] = useState("");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [taskXpReward, setTaskXpReward] = useState(10);
+  const [taskConfig, setTaskConfig] = useState<Record<string, any>>({});
 
-  const startNewTask = () => {
-    setCurrentTask({
-      tempId: Date.now().toString(),
-      title: "",
-      description: "",
-      xpReward: 10,
-      verificationConfig: {},
-    });
-    setSelectedCategory(null);
-    setSelectedSubtype(null);
-    setBuilderStep("category");
-    setShowTaskBuilder(true);
+  const resetTaskForm = () => {
+    setSelectedCategory("");
+    setSelectedSubtype("");
+    setTaskTitle("");
+    setTaskDescription("");
+    setTaskXpReward(10);
+    setTaskConfig({});
+    setShowTaskForm(false);
   };
 
-  const selectCategory = (category: TaskCategory) => {
-    setSelectedCategory(category);
-    setCurrentTask({ ...currentTask, taskCategory: category });
-    setBuilderStep("subtype");
-  };
-
-  const selectSubtype = (subtype: string) => {
-    setSelectedSubtype(subtype);
-    setCurrentTask({ ...currentTask, taskSubtype: subtype });
-    setBuilderStep("configure");
-  };
-
-  const addTaskToList = () => {
-    if (!currentTask.title || !currentTask.taskCategory || !currentTask.taskSubtype) {
-      alert("Please fill in all required fields");
+  const handleSaveTask = () => {
+    if (!taskTitle.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a task title",
+        variant: "destructive",
+      });
       return;
     }
-    setTasks([...tasks, { ...currentTask }]);
-    setShowTaskBuilder(false);
+    
+    if (!selectedCategory || !selectedSubtype) {
+      toast({
+        title: "Error",
+        description: "Please select task category and type",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newTask: TaskInProgress = {
+      tempId: Date.now().toString(),
+      title: taskTitle,
+      description: taskDescription,
+      taskCategory: selectedCategory,
+      taskSubtype: selectedSubtype,
+      xpReward: taskXpReward,
+      verificationConfig: taskConfig,
+    };
+
+    setTasks([...tasks, newTask]);
+    
+    toast({
+      title: "Success",
+      description: "Task added to campaign",
+    });
+
+    resetTaskForm();
   };
+
+  const renderTaskSpecificFields = () => {
+    if (!selectedCategory) return null;
+
+    switch (selectedCategory) {
+      case "twitter":
+        return (
+          <div>
+            <label className="text-white font-bold text-sm mb-2 block">Twitter URL</label>
+            <Input
+              placeholder="https://twitter.com/..."
+              className="glass rounded-full"
+              value={taskConfig.tweetUrl || ""}
+              onChange={(e) => setTaskConfig({ ...taskConfig, tweetUrl: e.target.value })}
+            />
+          </div>
+        );
+
+      case "discord":
+        return (
+          <>
+            <div>
+              <label className="text-white font-bold text-sm mb-2 block">Server Invite Link *</label>
+              <Input
+                placeholder="https://discord.gg/..."
+                className="glass rounded-full"
+                value={taskConfig.serverInvite || ""}
+                onChange={(e) => setTaskConfig({ ...taskConfig, serverInvite: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-white font-bold text-sm mb-2 block">Server ID (optional)</label>
+              <Input
+                placeholder="123456789"
+                className="glass rounded-full"
+                value={taskConfig.serverId || ""}
+                onChange={(e) => setTaskConfig({ ...taskConfig, serverId: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-white font-bold text-sm mb-2 block">Channel ID (optional)</label>
+              <Input
+                placeholder="987654321"
+                className="glass rounded-full"
+                value={taskConfig.channelId || ""}
+                onChange={(e) => setTaskConfig({ ...taskConfig, channelId: e.target.value })}
+              />
+            </div>
+          </>
+        );
+
+      case "onchain":
+        return (
+          <>
+            <div>
+              <label className="text-white font-bold text-sm mb-2 block">Chain ID</label>
+              <Input
+                type="number"
+                placeholder="1 (Ethereum Mainnet)"
+                className="glass rounded-full"
+                value={taskConfig.chainId || ""}
+                onChange={(e) => setTaskConfig({ ...taskConfig, chainId: parseInt(e.target.value) })}
+              />
+            </div>
+            <div>
+              <label className="text-white font-bold text-sm mb-2 block">Contract Address (optional)</label>
+              <Input
+                placeholder="0x..."
+                className="glass rounded-full"
+                value={taskConfig.contractAddress || ""}
+                onChange={(e) => setTaskConfig({ ...taskConfig, contractAddress: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-white font-bold text-sm mb-2 block">Minimum Balance (optional)</label>
+              <Input
+                type="number"
+                placeholder="0.1"
+                className="glass rounded-full"
+                value={taskConfig.minBalance || ""}
+                onChange={(e) => setTaskConfig({ ...taskConfig, minBalance: parseFloat(e.target.value) })}
+              />
+            </div>
+          </>
+        );
+
+      case "telegram":
+        return (
+          <>
+            <div>
+              <label className="text-white font-bold text-sm mb-2 block">Group/Channel Invite Link *</label>
+              <Input
+                placeholder="https://t.me/..."
+                className="glass rounded-full"
+                value={taskConfig.groupInvite || ""}
+                onChange={(e) => setTaskConfig({ ...taskConfig, groupInvite: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-white font-bold text-sm mb-2 block">Group ID (optional)</label>
+              <Input
+                placeholder="123456789"
+                className="glass rounded-full"
+                value={taskConfig.groupId || ""}
+                onChange={(e) => setTaskConfig({ ...taskConfig, groupId: e.target.value })}
+              />
+            </div>
+          </>
+        );
+
+      case "email":
+        return (
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="emailVerification"
+              className="w-4 h-4"
+              checked={taskConfig.requireVerification || false}
+              onChange={(e) => setTaskConfig({ ...taskConfig, requireVerification: e.target.checked })}
+            />
+            <label htmlFor="emailVerification" className="text-white font-bold text-sm">
+              Require email verification
+            </label>
+          </div>
+        );
+
+      case "quiz":
+        return (
+          <div className="glass rounded-3xl p-4">
+            <p className="text-white/60 text-sm">Quiz questions can be configured after task creation</p>
+          </div>
+        );
+
+      case "poh":
+        return (
+          <>
+            <div>
+              <label className="text-white font-bold text-sm mb-2 block">POH Provider</label>
+              <Select
+                value={taskConfig.provider || ""}
+                onValueChange={(value) => setTaskConfig({ ...taskConfig, provider: value })}
+              >
+                <SelectTrigger className="glass rounded-full">
+                  <SelectValue placeholder="Select provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="authena">Authena</SelectItem>
+                  <SelectItem value="github-passport">GitHub Passport</SelectItem>
+                  <SelectItem value="gitcoin-passport">Gitcoin Passport</SelectItem>
+                  <SelectItem value="worldcoin">Worldcoin</SelectItem>
+                  <SelectItem value="brightid">BrightID</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-white font-bold text-sm mb-2 block">Minimum Score (optional)</label>
+              <Input
+                type="number"
+                placeholder="20"
+                className="glass rounded-full"
+                value={taskConfig.minScore || ""}
+                onChange={(e) => setTaskConfig({ ...taskConfig, minScore: parseInt(e.target.value) })}
+              />
+            </div>
+          </>
+        );
+
+      default:
+        return null;
+    }
+  };
+
 
   const removeTask = (tempId: string) => {
     setTasks(tasks.filter(t => t.tempId !== tempId));
@@ -148,305 +335,6 @@ export default function CampaignCreate() {
     }
   };
 
-  const renderCategorySelection = () => (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4 mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setShowTaskBuilder(false)}
-          className="text-white/60 hover:text-white"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Cancel
-        </Button>
-        <h3 className="text-lg font-bold text-white">Select Task Category</h3>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4">
-        {Object.values(TASK_CATEGORIES).map((category) => (
-          <Card
-            key={category}
-            className="glass glass-hover rounded-3xl p-6 cursor-pointer transition-all"
-            onClick={() => selectCategory(category)}
-          >
-            <div className="text-4xl mb-3">{TASK_CATEGORY_ICONS[category]}</div>
-            <h4 className="text-white font-bold text-lg">{TASK_CATEGORY_LABELS[category]}</h4>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderSubtypeSelection = () => {
-    if (!selectedCategory) return null;
-    const subtypes = TASK_SUBTYPES_BY_CATEGORY[selectedCategory];
-
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setBuilderStep("category")}
-            className="text-white/60 hover:text-white"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <p className="text-white/60 text-sm">Category: {TASK_CATEGORY_LABELS[selectedCategory]}</p>
-            <h3 className="text-lg font-bold text-white">Select Task Type</h3>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          {Object.entries(subtypes).map(([subtype, label]) => (
-            <Card
-              key={subtype}
-              className="glass glass-hover rounded-3xl p-6 cursor-pointer transition-all"
-              onClick={() => selectSubtype(subtype)}
-            >
-              <div className="flex items-center justify-between">
-                <h4 className="text-white font-bold">{label}</h4>
-                <ChevronRight className="w-5 h-5 text-white/40" />
-              </div>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderTaskConfiguration = () => {
-    if (!selectedCategory || !selectedSubtype) return null;
-    const subtypes = TASK_SUBTYPES_BY_CATEGORY[selectedCategory];
-
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setBuilderStep("subtype")}
-            className="text-white/60 hover:text-white"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <p className="text-white/60 text-sm">
-              {TASK_CATEGORY_LABELS[selectedCategory]} → {subtypes[selectedSubtype]}
-            </p>
-            <h3 className="text-lg font-bold text-white">Configure Task</h3>
-          </div>
-        </div>
-
-        <Card className="glass rounded-3xl p-6 space-y-4">
-          <div>
-            <label className="text-white font-bold text-sm mb-2 block">Task Title *</label>
-            <Input
-              value={currentTask.title}
-              onChange={(e) => setCurrentTask({ ...currentTask, title: e.target.value })}
-              placeholder="e.g., Follow us on Twitter"
-              className="glass rounded-full"
-            />
-          </div>
-
-          <div>
-            <label className="text-white font-bold text-sm mb-2 block">Description *</label>
-            <Textarea
-              value={currentTask.description}
-              onChange={(e) => setCurrentTask({ ...currentTask, description: e.target.value })}
-              placeholder="Describe what users need to do..."
-              className="glass rounded-3xl min-h-[100px]"
-            />
-          </div>
-
-          <div>
-            <label className="text-white font-bold text-sm mb-2 block">XP Reward *</label>
-            <Input
-              type="number"
-              value={currentTask.xpReward}
-              onChange={(e) => setCurrentTask({ ...currentTask, xpReward: parseInt(e.target.value) || 0 })}
-              className="glass rounded-full"
-            />
-          </div>
-
-          {renderTaskSpecificFields()}
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              onClick={addTaskToList}
-              className="rounded-full font-bold flex-1"
-            >
-              Add Task
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowTaskBuilder(false)}
-              className="rounded-full"
-            >
-              Cancel
-            </Button>
-          </div>
-        </Card>
-      </div>
-    );
-  };
-
-  const renderTaskSpecificFields = () => {
-    if (!selectedCategory) return null;
-
-    switch (selectedCategory) {
-      case "twitter":
-        return (
-          <div>
-            <label className="text-white font-bold text-sm mb-2 block">Twitter URL</label>
-            <Input
-              placeholder="https://twitter.com/..."
-              className="glass rounded-full"
-              onChange={(e) =>
-                setCurrentTask({
-                  ...currentTask,
-                  verificationConfig: { ...currentTask.verificationConfig, tweetUrl: e.target.value },
-                })
-              }
-            />
-          </div>
-        );
-
-      case "discord":
-        return (
-          <>
-            <div>
-              <label className="text-white font-bold text-sm mb-2 block">Server Invite Link</label>
-              <Input
-                placeholder="https://discord.gg/..."
-                className="glass rounded-full"
-                onChange={(e) =>
-                  setCurrentTask({
-                    ...currentTask,
-                    verificationConfig: { ...currentTask.verificationConfig, serverInvite: e.target.value },
-                  })
-                }
-              />
-            </div>
-            <div>
-              <label className="text-white font-bold text-sm mb-2 block">Server ID (optional)</label>
-              <Input
-                placeholder="123456789"
-                className="glass rounded-full"
-                onChange={(e) =>
-                  setCurrentTask({
-                    ...currentTask,
-                    verificationConfig: { ...currentTask.verificationConfig, serverId: e.target.value },
-                  })
-                }
-              />
-            </div>
-          </>
-        );
-
-      case "onchain":
-        return (
-          <>
-            <div>
-              <label className="text-white font-bold text-sm mb-2 block">Chain ID</label>
-              <Input
-                type="number"
-                placeholder="1 (Ethereum Mainnet)"
-                className="glass rounded-full"
-                onChange={(e) =>
-                  setCurrentTask({
-                    ...currentTask,
-                    verificationConfig: { ...currentTask.verificationConfig, chainId: parseInt(e.target.value) },
-                  })
-                }
-              />
-            </div>
-            <div>
-              <label className="text-white font-bold text-sm mb-2 block">Contract Address (optional)</label>
-              <Input
-                placeholder="0x..."
-                className="glass rounded-full"
-                onChange={(e) =>
-                  setCurrentTask({
-                    ...currentTask,
-                    verificationConfig: { ...currentTask.verificationConfig, contractAddress: e.target.value },
-                  })
-                }
-              />
-            </div>
-          </>
-        );
-
-      case "telegram":
-        return (
-          <div>
-            <label className="text-white font-bold text-sm mb-2 block">Group/Channel Invite Link</label>
-            <Input
-              placeholder="https://t.me/..."
-              className="glass rounded-full"
-              onChange={(e) =>
-                setCurrentTask({
-                  ...currentTask,
-                  verificationConfig: { ...currentTask.verificationConfig, groupInvite: e.target.value },
-                })
-              }
-            />
-          </div>
-        );
-
-      case "email":
-        return (
-          <div>
-            <label className="text-white font-bold text-sm mb-2 block">
-              <input
-                type="checkbox"
-                className="mr-2"
-                onChange={(e) =>
-                  setCurrentTask({
-                    ...currentTask,
-                    verificationConfig: { ...currentTask.verificationConfig, requireVerification: e.target.checked },
-                  })
-                }
-              />
-              Require email verification
-            </label>
-          </div>
-        );
-
-      case "quiz":
-        return (
-          <div className="glass rounded-3xl p-4">
-            <p className="text-white/60 text-sm">Quiz questions can be configured after task creation</p>
-          </div>
-        );
-
-      case "poh":
-        return (
-          <div>
-            <label className="text-white font-bold text-sm mb-2 block">Minimum Score (optional)</label>
-            <Input
-              type="number"
-              placeholder="20"
-              className="glass rounded-full"
-              onChange={(e) =>
-                setCurrentTask({
-                  ...currentTask,
-                  verificationConfig: { ...currentTask.verificationConfig, minScore: parseInt(e.target.value) },
-                })
-              }
-            />
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
-
   return (
     <div className="min-h-screen bg-black p-8">
       <div className="max-w-6xl mx-auto">
@@ -464,130 +352,243 @@ export default function CampaignCreate() {
           </Button>
         </div>
 
-        {!showTaskBuilder ? (
-          <div className="space-y-6">
-            {/* Campaign Details */}
-            <Card className="glass rounded-3xl p-8">
-              <h2 className="text-xl font-bold text-white mb-6">Campaign Details</h2>
-              <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Campaign Details */}
+          <Card className="glass rounded-3xl p-8">
+            <h2 className="text-xl font-bold text-white mb-6">Campaign Details</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-white font-bold text-sm mb-2 block">Campaign Name *</label>
+                <Input
+                  value={campaignName}
+                  onChange={(e) => setCampaignName(e.target.value)}
+                  placeholder="Enter campaign name"
+                  className="glass rounded-full"
+                />
+              </div>
+
+              <div>
+                <label className="text-white font-bold text-sm mb-2 block">Description</label>
+                <Textarea
+                  value={campaignDescription}
+                  onChange={(e) => setCampaignDescription(e.target.value)}
+                  placeholder="Describe your campaign..."
+                  className="glass rounded-3xl min-h-[120px]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-white font-bold text-sm mb-2 block">Campaign Name *</label>
+                  <label className="text-white font-bold text-sm mb-2 block">Start Date</label>
                   <Input
-                    value={campaignName}
-                    onChange={(e) => setCampaignName(e.target.value)}
-                    placeholder="Enter campaign name"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
                     className="glass rounded-full"
                   />
                 </div>
-
                 <div>
-                  <label className="text-white font-bold text-sm mb-2 block">Description</label>
-                  <Textarea
-                    value={campaignDescription}
-                    onChange={(e) => setCampaignDescription(e.target.value)}
-                    placeholder="Describe your campaign..."
-                    className="glass rounded-3xl min-h-[120px]"
+                  <label className="text-white font-bold text-sm mb-2 block">End Date</label>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="glass rounded-full"
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-white font-bold text-sm mb-2 block">Start Date</label>
-                    <Input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="glass rounded-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-white font-bold text-sm mb-2 block">End Date</label>
-                    <Input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="glass rounded-full"
-                    />
-                  </div>
-                </div>
               </div>
-            </Card>
+            </div>
+          </Card>
 
-            {/* Tasks Section */}
-            <Card className="glass rounded-3xl p-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-white">Campaign Tasks</h2>
-                <Button
-                  onClick={startNewTask}
-                  className="rounded-full font-bold"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Task
-                </Button>
-              </div>
-
-              {tasks.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-white/60">No tasks added yet</p>
-                  <p className="text-white/40 text-sm mt-2">Click "Add Task" to create your first task</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {tasks.map((task, index) => (
-                    <Card key={task.tempId} className="glass glass-hover rounded-3xl p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className="text-2xl">{task.taskCategory && TASK_CATEGORY_ICONS[task.taskCategory]}</span>
-                            <div>
-                              <h4 className="text-white font-bold">{task.title}</h4>
-                              <p className="text-white/60 text-sm">
-                                {task.taskCategory && TASK_CATEGORY_LABELS[task.taskCategory]} · {task.xpReward} XP
-                              </p>
-                            </div>
-                          </div>
-                          <p className="text-white/50 text-sm ml-11">{task.description}</p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeTask(task.tempId)}
-                          className="text-white/40 hover:text-red-400"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            {/* Submit Button */}
-            <div className="flex justify-end gap-3">
+          {/* Tasks Section */}
+          <Card className="glass rounded-3xl p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Campaign Tasks</h2>
               <Button
-                variant="outline"
-                onClick={() => setLocation("/campaigns")}
-                className="rounded-full"
+                onClick={() => setShowTaskForm(true)}
+                className="rounded-full font-bold"
               >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={!campaignName.trim() || tasks.length === 0 || isSubmitting}
-                className="rounded-full font-bold px-8"
-              >
-                {isSubmitting ? "Creating..." : "Create Campaign"}
+                <Plus className="w-4 h-4 mr-2" />
+                Add Task
               </Button>
             </div>
-          </div>
-        ) : (
-          <Card className="glass rounded-3xl p-8">
-            {builderStep === "category" && renderCategorySelection()}
-            {builderStep === "subtype" && renderSubtypeSelection()}
-            {builderStep === "configure" && renderTaskConfiguration()}
+
+            {/* Task Form (Dropdown Workflow) */}
+            {showTaskForm && (
+              <Card className="glass rounded-3xl p-6 space-y-4 mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-white">New Task</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={resetTaskForm}
+                    className="text-white/40 hover:text-white/60"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {/* Category Dropdown */}
+                <div>
+                  <label className="text-white font-bold text-sm mb-2 block">Task Category *</label>
+                  <Select
+                    value={selectedCategory}
+                    onValueChange={(value) => {
+                      setSelectedCategory(value as TaskCategory);
+                      setSelectedSubtype("");
+                    }}
+                  >
+                    <SelectTrigger className="glass rounded-full">
+                      <SelectValue placeholder="Select task category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.values(TASK_CATEGORIES).map((category) => (
+                        <SelectItem key={category} value={category}>
+                          <div className="flex items-center gap-2">
+                            <span>{TASK_CATEGORY_ICONS[category]}</span>
+                            <span>{TASK_CATEGORY_LABELS[category]}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Subtype Dropdown (only shown when category selected) */}
+                {selectedCategory && (
+                  <div>
+                    <label className="text-white font-bold text-sm mb-2 block">Task Type *</label>
+                    <Select
+                      value={selectedSubtype}
+                      onValueChange={setSelectedSubtype}
+                    >
+                      <SelectTrigger className="glass rounded-full">
+                        <SelectValue placeholder="Select task type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(TASK_SUBTYPES_BY_CATEGORY[selectedCategory]).map(([subtype, label]) => (
+                          <SelectItem key={subtype} value={subtype}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Task Details (only shown when subtype selected) */}
+                {selectedSubtype && (
+                  <>
+                    <div>
+                      <label className="text-white font-bold text-sm mb-2 block">Task Title *</label>
+                      <Input
+                        value={taskTitle}
+                        onChange={(e) => setTaskTitle(e.target.value)}
+                        placeholder="e.g., Follow us on Twitter"
+                        className="glass rounded-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-white font-bold text-sm mb-2 block">Description</label>
+                      <Textarea
+                        value={taskDescription}
+                        onChange={(e) => setTaskDescription(e.target.value)}
+                        placeholder="Describe what users need to do..."
+                        className="glass rounded-3xl min-h-[100px]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-white font-bold text-sm mb-2 block">XP Reward *</label>
+                      <Input
+                        type="number"
+                        value={taskXpReward}
+                        onChange={(e) => setTaskXpReward(parseInt(e.target.value) || 10)}
+                        className="glass rounded-full"
+                      />
+                    </div>
+
+                    {/* Task-specific fields */}
+                    {renderTaskSpecificFields()}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3 pt-4">
+                      <Button
+                        onClick={handleSaveTask}
+                        className="rounded-full font-bold flex-1"
+                      >
+                        Save Task
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={resetTaskForm}
+                        className="rounded-full"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </Card>
+            )}
+
+            {/* Task List */}
+            {tasks.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-white/60">No tasks added yet</p>
+                <p className="text-white/40 text-sm mt-2">Click "Add Task" to create your first task</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {tasks.map((task) => (
+                  <Card key={task.tempId} className="glass glass-hover rounded-3xl p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-2xl">{task.taskCategory && TASK_CATEGORY_ICONS[task.taskCategory]}</span>
+                          <div>
+                            <h4 className="text-white font-bold">{task.title}</h4>
+                            <p className="text-white/60 text-sm">
+                              {task.taskCategory && TASK_CATEGORY_LABELS[task.taskCategory]} · {task.xpReward} XP
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-white/50 text-sm ml-11">{task.description}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeTask(task.tempId)}
+                        className="text-white/40 hover:text-red-400"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
           </Card>
-        )}
+
+          {/* Submit Button */}
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setLocation("/campaigns")}
+              className="rounded-full"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={!campaignName.trim() || tasks.length === 0 || isSubmitting}
+              className="rounded-full font-bold px-8"
+            >
+              {isSubmitting ? "Creating..." : "Create Campaign"}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

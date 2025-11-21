@@ -1,5 +1,18 @@
 import React, { useEffect, useState } from "react";
 
+// Use Vite env var if provided, otherwise fall back to the deployed backend URL.
+// `import.meta.env` may not be typed in this project, so access defensively.
+// Prefer configured Vite env var; fallback to localhost for dev instead of the deployed Render URL
+const BACKEND_BASE = ((import.meta as any).env?.VITE_BACKEND_URL as string) ||
+  "http://localhost:5051";
+
+function buildUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
+  const p = path.replace(/^\/+/, "");
+  return `${base}/${p}`;
+}
+
 export default function ProjectOverview({ params }: any) {
   const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -7,7 +20,7 @@ export default function ProjectOverview({ params }: any) {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/projects/${params.projectId}`);
+        const res = await fetch(buildUrl(`/projects/${params.projectId}`));
         if (!res.ok) throw new Error("not found");
         const json = await res.json();
         setProject(json);

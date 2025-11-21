@@ -19,6 +19,19 @@ import { Progress } from "@/components/ui/progress";
 import { emitSessionChange } from "@/lib/session";
 import AnimatedBackground from "@/components/AnimatedBackground";
 
+// Use Vite env var if provided, otherwise fall back to the deployed backend URL.
+// `import.meta.env` may not be typed in this project, so access defensively.
+// Prefer configured Vite env var; fallback to localhost for dev instead of the deployed Render URL
+const BACKEND_BASE = ((import.meta as any).env?.VITE_BACKEND_URL as string) ||
+  "http://localhost:5051";
+
+function buildUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
+  const p = path.replace(/^\/+/, "");
+  return `${base}/${p}`;
+}
+
 function WalletDropdown() {
   const { isConnected, connectWallet, address, disconnect } = useWallet();
   const { signOut } = useAuth();
@@ -73,7 +86,7 @@ export default function Profile() {
   useEffect(() => {
     if (user?.id) {
       setLoadingReferrals(true);
-      fetch(`/api/referrals/stats/${user.id}`)
+      fetch(buildUrl(`/api/referrals/stats/${user.id}`))
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data?.totalReferrals !== undefined) {

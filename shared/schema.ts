@@ -123,6 +123,21 @@ export const quests = pgTable("quests", {
   updatedAt: timestamp("updated_at"),
 });
 
+// Quest completions - records when a user completes a specific quest
+export const questCompletions = pgTable("quest_completions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  questId: varchar("quest_id").notNull().references(() => quests.id),
+  xpAwarded: integer("xp_awarded").notNull(),
+  metadata: text("metadata").default("{}").notNull(), // JSON with any verification/proof
+  completedAt: timestamp("completed_at").defaultNow().notNull(),
+});
+
+export const insertQuestCompletionSchema = createInsertSchema(questCompletions).omit({ id: true, completedAt: true });
+
+export type InsertQuestCompletion = z.infer<typeof insertQuestCompletionSchema>;
+export type QuestCompletion = typeof questCompletions.$inferSelect;
+
 export const projectTasks = pgTable("project_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull(),

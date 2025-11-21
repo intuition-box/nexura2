@@ -26,7 +26,15 @@ if (typeof window !== "undefined") {
 			const msg = typeof reason === "string" ? reason : reason?.message ?? String(reason);
 			const localOrigin = window.location.origin;
 			if (typeof msg === "string" && msg.includes("has not been authorized")) {
-				if (localOrigin?.includes("localhost") || localOrigin?.includes("127.0.0.1") || localOrigin?.includes(":5051")) {
+				const isLocalHost = !!localOrigin && (
+					localOrigin.includes("localhost") ||
+					localOrigin.includes("127.0.0.1") ||
+					localOrigin.includes(":5051") ||
+					localOrigin.includes("192.168.") ||
+					localOrigin.includes("10.") ||
+					/https?:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\./.test(localOrigin)
+				);
+				if (isLocalHost) {
 					ev.preventDefault();
 					console.warn("Reown AppKit authorization error suppressed:", msg);
 					return;

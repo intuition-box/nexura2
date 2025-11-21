@@ -12,10 +12,75 @@ try {
 }
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import pg from "pg";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+  // Session middleware: prefer a persistent store when DATABASE_URL is provided.
+  // This enables server-side sessions (cookie-based) for production deployments
+  // such as Render. The session cookie is Secure in production and uses a
+  // server-side store backed by Postgres via connect-pg-simple when available.
+  const SESSION_SECRET = process.env.SESSION_SECRET || process.env.SECRET || "replace-me";
+  const pgConnection = process.env.DATABASE_URL || process.env.PG_CONNECTION_STRING || null;
+  const PgSession = connectPgSimple(session as any);
+  let sessionStore: any = undefined;
+
+  try {
+    if (pgConnection) {
+      const pgPool = new pg.Pool({ connectionString: pgConnection });
+      sessionStore = new PgSession({ pool: pgPool });
+    }
+  } catch (e) {
+    console.warn("Failed to initialize Postgres session store, falling back to in-memory store", e);
+    sessionStore = undefined;
+  }
+
+  app.use(
+    session({
+      store: sessionStore,
+      secret: SESSION_SECRET,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+      },
+    }) as any,
+  );
+
+// CORS: do not use cookies or credentialed requests. The API uses Authorization: Bearer <token>
+// Allow cross-origin requests but do NOT advertise support for credentials/cookies.
+app.use((req, res, next) => {
+  // CORS configuration. In production, prefer an explicit FRONTEND_URL so we
+  // can enable credentialed cookie-based sessions. In development we allow
+  // any origin to simplify testing (no credentials).
+  const FRONTEND_URL = process.env.FRONTEND_URL || process.env.VITE_FRONTEND_URL || null;
+  if (process.env.NODE_ENV === 'production' && FRONTEND_URL) {
+    res.setHeader('Access-Control-Allow-Origin', FRONTEND_URL);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
+  );
+
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -49,6 +114,9 @@ app.use((req, res, next) => {
 
 // Serve attached_assets before the catch-all route
 app.use("/attached_assets", express.static(path.resolve(import.meta.dirname, "..", "attached_assets")));
+
+// Serve uploaded files
+app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 
 (async () => {
   try {

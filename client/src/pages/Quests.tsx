@@ -14,20 +14,27 @@ import AnimatedBackground from "@/components/AnimatedBackground";
 import dailyQuestImg from "@assets/generated_images/Daily_Quest_Completion_Image_83de888a.png";
 import gettingStartedImg from "@assets/generated_images/Getting_Started_Quest_Image_9a7ae50b.png";
 
+// Use Vite env var if provided, otherwise fall back to the deployed backend URL.
+// `import.meta.env` may not be typed in this project, so access defensively.
+// Prefer configured Vite env var; fallback to localhost for dev instead of the deployed Render URL
+const BACKEND_BASE = ((import.meta as any).env?.VITE_BACKEND_URL as string) ||
+  "http://localhost:5051";
+
+function buildUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
+  const p = path.replace(/^\/+/, "");
+  return `${base}/${p}`;
+}
+
 export default function Quests() {
   const [activeTab, setActiveTab] = useState("daily");
   const [, setLocation] = useLocation();
   const { user, loading } = useAuth();
   const { toast } = useToast();
   
-  const [claimedTasks, setClaimedTasks] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem('nexura:quests:claimed');
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  // claimedTasks is authoritative from the server; do not persist to localStorage for important state.
+  const [claimedTasks, setClaimedTasks] = useState<string[]>([]);
 
   // When the backend profile has been reset (xp, questsCompleted, tasksCompleted are zero) we
   // should also clear any locally persisted claimed task state so quests become claimable again.
@@ -37,6 +44,40 @@ export default function Quests() {
       // We access it via useAuth below once available.
     } catch {}
   }, []);
+
+  // Sync local claimed tasks with server-side completed quests for the signed-in user.
+  // This ensures the UI reflects server truth (prevents double-claim and stale local state).
+  useEffect(() => {
+    if (!user || !user.id) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        try {
+          const token = localStorage.getItem('accessToken');
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+        } catch (e) { /* ignore localStorage errors */ }
+
+        const res = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers });
+        if (!res.ok) return;
+        const json = await res.json().catch(() => ({}));
+        const serverCompleted: string[] = Array.isArray(json?.completed) ? json.completed : [];
+        if (cancelled) return;
+
+        if (serverCompleted.length > 0) {
+          setClaimedTasks((prev) => {
+            const merged = Array.from(new Set([...(prev || []), ...serverCompleted]));
+            return merged;
+          });
+        }
+      } catch (e) {
+        console.warn('[Quests] failed to sync completed quests from server', e);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   const [connectedX, setConnectedX] = useState<boolean>(() => {
     try { return localStorage.getItem('nexura:connected:x') === '1'; } catch(e){ return false; }
@@ -251,30 +292,21 @@ export default function Quests() {
     if (!claimedTasks.includes(taskId)) {
       const next = [...claimedTasks, taskId];
       setClaimedTasks(next);
-      try { localStorage.setItem('nexura:quests:claimed', JSON.stringify(next)); } catch(e){}
     }
   };
 
   const unclaimTask = (taskId: string) => {
     const next = claimedTasks.filter(id => id !== taskId);
     setClaimedTasks(next);
-    try { localStorage.setItem('nexura:quests:claimed', JSON.stringify(next)); } catch(e){}
   };
 
-  const [visitedTasks, setVisitedTasks] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem('nexura:quests:visited');
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  // visitedTasks is an in-memory UI hint only; do not persist to localStorage for important state
+  const [visitedTasks, setVisitedTasks] = useState<string[]>([]);
 
   const markVisited = (taskId: string) => {
     if (!visitedTasks.includes(taskId)) {
       const next = [...visitedTasks, taskId];
       setVisitedTasks(next);
-      try { localStorage.setItem('nexura:quests:visited', JSON.stringify(next)); } catch(e){}
     }
   };
 
@@ -326,71 +358,86 @@ export default function Quests() {
 
     try {
       console.log('[Quests] Awarding XP:', { userId: user.id, xp: xpAmount, questId: quest.id });
-      const resp = await apiRequest('POST', '/api/xp/add', {
-        userId: user.id,
-        xp: xpAmount,
-        questId: quest.id, // Send quest ID to server for validation
-        questsCompletedDelta,
-        tasksCompletedDelta,
+
+      // Build headers with bearer token
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      try {
+        const token = localStorage.getItem('accessToken');
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+      } catch (e) { /* ignore */ }
+
+      const resp = await fetch(buildUrl('/api/xp/add'), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ userId: user.id, xp: xpAmount, questId: quest.id, questsCompletedDelta, tasksCompletedDelta }),
       });
-      
+
       if (resp.status === 409) {
         // Quest already completed on server
         console.warn('[Quests] Quest already completed on server:', quest.id);
-        // Mark as claimed locally to sync with server state
-        handleClaimTask(quest.id);
-        toast({
-          title: 'Already claimed',
-          description: 'You have already claimed this quest.',
-          variant: 'destructive'
-        });
+        // Sync claimedTasks from server
+        try {
+          const headers2: Record<string, string> = { "Content-Type": "application/json" };
+          const token2 = localStorage.getItem('accessToken');
+          if (token2) headers2['Authorization'] = `Bearer ${token2}`;
+          const r = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers: headers2 });
+          if (r.ok) {
+            const j = await r.json().catch(() => ({}));
+            const serverCompleted = Array.isArray(j?.completed) ? j.completed : [];
+            setClaimedTasks(serverCompleted);
+          } else {
+            handleClaimTask(quest.id);
+          }
+        } catch (e) {
+          handleClaimTask(quest.id);
+        }
+        toast({ title: 'Already claimed', description: 'You have already claimed this quest.', variant: 'destructive' });
         return;
       }
-      
+
       if (!resp.ok) {
-        throw new Error(`API returned ${resp.status}`);
+        const text = await resp.text().catch(() => String(resp.status));
+        throw new Error(`API returned ${resp.status}: ${text}`);
       }
-      
-      const json = await resp.json();
+
+      const json = await resp.json().catch(() => ({}));
       console.log('[Quests] POST /api/xp/add SUCCESS:', json);
-      
-      // Only mark as claimed after successful API call
-      handleClaimTask(quest.id);
-      
-      // Force profile refresh - wait for it to complete
-      try { 
-        console.log('[Quests] Refreshing profile via /api/me...');
-        await apiRequest('GET', '/api/me'); 
-      } catch(e) { 
-        console.warn('[Quests] Failed to refresh /api/me:', e);
+
+      // Sync claimedTasks from server (authoritative)
+      try {
+        const headers2: Record<string, string> = { "Content-Type": "application/json" };
+        const token2 = localStorage.getItem('accessToken');
+        if (token2) headers2['Authorization'] = `Bearer ${token2}`;
+        const r = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers: headers2 });
+        if (r.ok) {
+          const j = await r.json().catch(() => ({}));
+          const serverCompleted = Array.isArray(j?.completed) ? j.completed : [];
+          setClaimedTasks(serverCompleted);
+        } else {
+          handleClaimTask(quest.id);
+        }
+      } catch (e) {
+        console.warn('[Quests] failed to refresh claimedTasks after claim', e);
+        handleClaimTask(quest.id);
       }
-      
-      // Small delay to ensure server state is consistent
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Emit session change to trigger AuthProvider refresh
-      try { 
+
+      // Emit session change so AuthProvider refetches profile
+      try {
         console.log('[Quests] Emitting session change...');
-        emitSessionChange(); 
-      } catch(e){
+        emitSessionChange();
+      } catch (e) {
         console.warn('[Quests] Failed to emit session change:', e);
       }
-      
-      // Wait a moment for the AuthProvider to update
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      // Show success toast
-      toast({ 
-        title: 'XP awarded!', 
-        description: `+${xpAmount} XP earned! Total: ${json.xp || 0} XP` 
-      });
+
+      // Small delay to allow profile refresh to propagate
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // Show success toast — prefer xp value from server result if available
+      const totalXp = (json && (json.xp || json.result?.xp)) ?? null;
+      toast({ title: 'XP awarded!', description: `+${xpAmount} XP earned${totalXp ? ` — total: ${totalXp} XP` : ''}` });
     } catch (e) {
       console.error('[Quests] Failed to persist XP:', e);
-      toast({
-        title: 'Error',
-        description: 'Failed to award XP. Please try again.',
-        variant: 'destructive'
-      });
+      toast({ title: 'Error', description: 'Failed to award XP. Please try again.', variant: 'destructive' });
     }
   };
 
@@ -405,13 +452,18 @@ export default function Quests() {
         // map to server endpoints
         const endpoint = action.includes('follow') ? '/quests/verify/follow' : action.includes('like') ? '/quests/verify/like' : action.includes('retweet') ? '/quests/verify/retweet' : null;
         if (endpoint) {
-          // send target info if available
+          // send target info if available — use apiRequest so Authorization header is applied
           const target = quest.target || 'your_x_account';
-          fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target }), credentials: 'include' })
-            .then(r => r.json().catch(() => null))
-            .then(json => {
-              if (json && json.ok) handleClaimTask(quest.id);
-            }).catch(() => {});
+          try {
+            apiRequest('POST', endpoint, { target })
+              .then(r => r.json().catch(() => null))
+              .then(json => {
+                if (json && json.ok) handleClaimTask(quest.id);
+              }).catch(() => {});
+          } catch (e) {
+            // ignore - claim will remain local-only
+            console.warn('[Quests] verify request failed', e);
+          }
           return;
         }
       }
@@ -519,9 +571,8 @@ export default function Quests() {
     const qc = Number((user as any).questsCompleted || (user as any).quests_completed || 0);
     const tc = Number((user as any).tasksCompleted || (user as any).tasks_completed || 0);
     if (xp === 0 && qc === 0 && tc === 0 && claimedTasks.length > 0) {
-      console.log('[Quests] Detected profile reset, clearing claimedTasks local cache');
+      console.log('[Quests] Detected profile reset, clearing claimedTasks cache');
       setClaimedTasks([]);
-      try { localStorage.removeItem('nexura:quests:claimed'); } catch {}
     }
   }, [user, claimedTasks.length]);
 
@@ -707,7 +758,7 @@ export default function Quests() {
                     
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
-                        <div className="font-semibold text-primary">{task.reward}</div>
+                        <div className="font-semibold text-primary">{typeof task.xp === 'number' ? `+${task.xp} XP` : task.reward}</div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button size="sm" variant="default" onClick={() => { try { setLocation(`/quest/${task.id}`); markVisited(task.id); } catch(e){} }}>
@@ -781,7 +832,7 @@ export default function Quests() {
                     
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
-                        <div className="font-semibold text-primary">{quest.reward}</div>
+                        <div className="font-semibold text-primary">{typeof quest.xp === 'number' ? `+${quest.xp} XP` : quest.reward}</div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button

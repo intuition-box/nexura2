@@ -3,6 +3,20 @@ import { apiRequest } from "./queryClient";
 import { setSessionToken, clearSession, getSessionToken, onSessionChange, emitSessionChange } from "./session";
 import { toast } from "@/hooks/use-toast";
 
+// Prefer a runtime-injected backend URL (window.__BACKEND_URL__), then build-time Vite env var,
+// otherwise fall back to localhost for developer convenience.
+// This allows deploying the same bundle to multiple environments by injecting
+// `window.__BACKEND_URL__` from the server/HTML without rebuilding.
+const RUNTIME_BACKEND = (typeof window !== 'undefined' && (window as any).__BACKEND_URL__) || undefined;
+const BACKEND_BASE = RUNTIME_BACKEND || ((import.meta as any).env?.VITE_BACKEND_URL as string) || "http://localhost:5051";
+
+function buildUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
+  const p = path.replace(/^\/+/, "");
+  return `${base}/${p}`;
+}
+
 type User = any;
 
 type AuthContextType = {
@@ -21,10 +35,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function fetchProfile() {
       try {
+        // Build auth headers
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        const token = getSessionToken();
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+          console.log("🔑 Sending Authorization header for /api/me");
+        } else {
+          console.log("❌ No accessToken found for /api/me");
+        }
+
         // Use regular fetch instead of apiRequest to avoid thrown errors
-        const res = await fetch("/api/me", { 
-          credentials: "include",
-          headers: { "Content-Type": "application/json" }
+        const res = await fetch(buildUrl("/api/me"), {
+          headers
         }).catch(err => {
           console.warn("Network error fetching profile:", err);
           return null;
@@ -84,11 +107,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const unsub = onSessionChange(async () => {
       try {
-        const res = await fetch("/api/me", { 
-          credentials: "include",
-          headers: { "Content-Type": "application/json" }
-        });
-        
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        const token = getSessionToken();
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const res = await fetch(buildUrl("/api/me"), { headers });
+
         if (res.ok) {
           const json = await res.json();
           const userData = json?.user ? { ...json.user, ...(json.profile || {}) } : null;

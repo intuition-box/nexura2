@@ -41,7 +41,6 @@ interface Dapp {
 
 export default function EcosystemDapps() {
   const [, setLocation] = useLocation();
-  const [claimedDapps, setClaimedDapps] = useState<Set<string>>(new Set());
 
   const dapps: Dapp[] = [
     // Priority order: intuition portal, oracle lend, intudex, 3,3 dice game, trust name service
@@ -249,16 +248,7 @@ export default function EcosystemDapps() {
     window.open(dapp.websiteUrl, '_blank', 'noopener,noreferrer');
   };
 
-  const handleClaimClick = (dapp: Dapp, event: React.MouseEvent) => {
-    event.stopPropagation();
-    // Add to claimed dapps
-    setClaimedDapps(prev => {
-      const newSet = new Set(prev);
-      newSet.add(dapp.id);
-      return newSet;
-    });
-    // Here you would also integrate with backend/blockchain to record the claim
-  };
+  // Claim functionality removed from UI — claims are handled elsewhere or not offered
 
   const handleCardClick = (dapp: Dapp) => {
     // Clicking anywhere on the card opens the website
@@ -402,17 +392,7 @@ export default function EcosystemDapps() {
                     Explore
                   </Button>
                   
-                  {!claimedDapps.has(dapp.id) && (
-                    <Button 
-                      className="flex-1"
-                      variant="quest"
-                      onClick={(e) => handleClaimClick(dapp, e)}
-                      data-testid={`claim-${dapp.id}`}
-                    >
-                      <Target className="w-4 h-4 mr-2" />
-                      Claim
-                    </Button>
-                  )}
+                  {/* Claim button removed per request */}
                 </div>
               </CardContent>
             </Card>

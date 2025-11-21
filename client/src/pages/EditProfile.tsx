@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth";
 import getSupabaseClient from "@/lib/supabaseClient";
 import { uploadFile } from "@/lib/upload";
+import { getSessionToken } from "@/lib/session";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,19 @@ import { useToast } from "@/hooks/use-toast";
 import { emitSessionChange } from "@/lib/session";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AnimatedBackground from "@/components/AnimatedBackground";
+
+// Use Vite env var if provided, otherwise fall back to the deployed backend URL.
+// `import.meta.env` may not be typed in this project, so access defensively.
+// Prefer configured Vite env var; fallback to localhost for dev instead of the deployed Render URL
+const BACKEND_BASE = ((import.meta as any).env?.VITE_BACKEND_URL as string) ||
+  "http://localhost:5051";
+
+function buildUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
+  const p = path.replace(/^\/+/, "");
+  return `${base}/${p}`;
+}
 
 export default function EditProfile() {
   const [, setLocation] = useLocation();
@@ -55,6 +69,11 @@ export default function EditProfile() {
         
         // If an avatar was selected, upload it
         if ((profileData as any).avatarFile) {
+          // Ensure we have an access token before attempting upload
+          if (!getSessionToken()) {
+            toast({ title: "Not signed in", description: "Please connect your wallet or sign in before uploading an avatar.", variant: "destructive" });
+            return;
+          }
           const file: File = (profileData as any).avatarFile;
           avatarUrl = await uploadFile(file, `avatars/${user?.id ?? 'guest'}`);
         }
@@ -66,10 +85,21 @@ export default function EditProfile() {
           socialProfiles: profileData.socialProfiles
         };
 
-        const res = await fetch('/api/users/profile', {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        try {
+          const token = localStorage.getItem('accessToken');
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+            console.log("🔑 Sending Authorization header for profile update");
+          } else {
+            console.log("❌ No accessToken found for profile update");
+          }
+        } catch (e) { /* ignore */ }
+
+        const res = await fetch(buildUrl('/api/users/profile'), {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
+          headers,
+          // Use Authorization bearer token in headers; server no longer relies on cookies
           body: JSON.stringify(updatePayload)
         });
 

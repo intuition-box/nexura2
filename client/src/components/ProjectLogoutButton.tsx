@@ -11,7 +11,8 @@ export default function ProjectLogoutButton() {
     try {
       auth.signOut();
     } catch (e) {
-      fetch('/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+      // logout endpoint doesn't rely on cookies; call without credentials
+      fetch('/auth/logout', { method: 'POST' }).catch(() => {});
     }
     setLocation('/profile');
   };

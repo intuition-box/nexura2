@@ -4,9 +4,12 @@ import { storage } from "./storage";
 import { insertReferralEventSchema, insertReferralClaimSchema } from "@shared/schema";
 import crypto from "crypto";
 import { verifyMessage } from "ethers";
+import fs from "fs";
+import path from "path";
 
-// In-memory stores for challenges and sessions. For production use a persistent store.
-const challenges = new Map<string, { message: string; expiresAt: number; used?: boolean }>();
+// In-memory stores for challenges and legacy bearer sessions. For production
+// we prefer server-side sessions (express-session) backed by Postgres.
+const challenges = new Map<string, { message: string; expiresAt: number; used?: boolean }>();// legacy
 const sessions = new Map<string, { address: string; createdAt: number }>();
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -53,7 +56,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dev helper: inspect persisted user profiles file
+  // Dev-only helper: inspect persisted user profiles file. Disabled in production.
   app.get('/__dev/user_profiles', async (req, res) => {
     try {
       if (process.env.NODE_ENV === 'production') return res.status(404).json({ error: 'not available' });
@@ -122,21 +125,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // mark challenge used
       if (stored) stored.used = true;
 
+
+      // Establish a server-side session for this authenticated user. We save the
+      // wallet address onto the session so subsequent requests can use cookie
+      // based authentication. This is the production-friendly behavior for
+      // deployments (e.g., Render). We still retain the legacy sessions map
+      // for bearer-token compatibility where necessary.
+      try {
+        (req as any).session.address = String(address).toLowerCase();
+        (req as any).session.createdAt = Date.now();
+      } catch (e) {
+        console.warn('failed to set cookie session', e);
+      }
+
+      // For backward compatibility with any clients expecting a bearer token,
+      // also create a short-lived legacy bearer token and return it in the
+      // response. This gives clients time to migrate to cookie-based sessions.
       const token = crypto.randomBytes(32).toString("hex");
       sessions.set(token, { address: String(address).toLowerCase(), createdAt: Date.now() });
-
-      // set httpOnly cookie for session (also return token in body for backwards compatibility)
-      const cookieName = process.env.SESSION_COOKIE_NAME || "nexura_sid";
-      const isProd = process.env.NODE_ENV === "production";
-      const cookieOpts: any = {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        secure: isProd,
-      };
-
-      res.cookie(cookieName, token, cookieOpts);
 
       // Ensure a user record exists for this address so /profile can return user data.
       try {
@@ -159,67 +165,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dev helper: create a session for an address without signature verification.
-  // This endpoint is meant for local development/testing only. It will be no-op in production.
-  app.post("/__dev/login", async (req, res) => {
-    try {
-      if (process.env.NODE_ENV === "production") return res.status(404).json({ error: "not found" });
-      const { address } = req.body || {};
-      if (!address) return res.status(400).json({ error: "address required" });
-      const addr = String(address).toLowerCase();
+  // Dev-only login helper removed for production readiness. If you need a
+  // developer-only shortcut, create it locally but do NOT deploy it to
+  // production. This endpoint was intentionally removed.
 
-      const token = crypto.randomBytes(32).toString("hex");
-      sessions.set(token, { address: addr, createdAt: Date.now() });
-
-      // set httpOnly cookie for session
-      const cookieName = process.env.SESSION_COOKIE_NAME || "nexura_sid";
-      const isProd = process.env.NODE_ENV === "production";
-      const cookieOpts: any = {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        secure: isProd,
-      };
-      res.cookie(cookieName, token, cookieOpts);
-
-      // ensure a user record exists
-      try {
-        const existing = await storage.getUserByAddress(addr);
-        if (!existing) {
-          const randPwd = crypto.randomBytes(12).toString("hex");
-          await storage.createUser({ username: addr, password: randPwd, address: addr } as any);
-        }
-      } catch (e) {
-        console.warn("dev login: failed to ensure user record", e);
-      }
-
-      return res.json({ accessToken: token });
-    } catch (e) {
-      console.error("__dev/login error", e);
-      return res.status(500).json({ error: "failed" });
-    }
-  });
+  // Removed permissive /auth/open endpoint for production. Use the wallet
+  // signature flow (/challenge + /auth/wallet) for secure logins.
 
   // --- Twitter (X) OAuth1.0a integration (request token -> authorize -> access token)
   const requestTokenSecrets = new Map<string, { secret: string; sessionToken?: string }>();
 
-  function parseCookies(header: string) {
-    return String(header || '').split(/;\s*/).reduce((acc: any, pair: string) => {
-      const [k, v] = pair.split('='); if (k) acc[k] = v; return acc;
-    }, {});
-  }
+  // parseCookies removed: authentication uses Authorization: Bearer <token> only
 
-  // helper to require an authenticated session cookie
+  // helper to require an authenticated session token
+  // Only accepts Authorization: Bearer <token>.
   function getSessionFromReq(req: any) {
-    const cookieHeader = String(req.headers.cookie || "");
-    const cookieName = process.env.SESSION_COOKIE_NAME || "nexura_sid";
-    const match = cookieHeader.split(/;\s*/).find((c: string) => c.startsWith(cookieName + "="));
-    if (!match) return null;
-    const token = match.split('=')[1];
-    if (!token) return null;
-    const s = sessions.get(token);
-    return { token, session: s };
+    try {
+      console.log(`🔍 Auth check for ${req.method} ${req.path}`);
+
+      // Primary: server-side cookie session (express-session)
+      try {
+        if (req.session && req.session.address) {
+          const token = req.sessionID || null;
+          const sessionObj = { address: String(req.session.address).toLowerCase(), createdAt: req.session.createdAt || Date.now() };
+          console.log(`✅ Auth via server-side session for ${String(sessionObj.address).substring(0,10)}...`);
+          return { token, session: sessionObj };
+        }
+      } catch (e) {
+        console.warn('session check failed', e);
+      }
+
+      // Fallback: legacy Bearer token support
+      const auth = String(req.headers.authorization || "").trim();
+      if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
+        console.log('❌ No Bearer authorization header present');
+        return null;
+      }
+      const token = auth.split(/\s+/)[1];
+      if (!token) {
+        console.log('❌ Malformed Bearer token');
+        return null;
+      }
+      const s = sessions.get(token);
+      if (!s) {
+        console.log('❌ Bearer token not found in sessions');
+        return null;
+      }
+      console.log(`✅ Auth via Bearer token for ${s.address.substring(0, 10)}...`);
+      return { token, session: s };
+    } catch (e) {
+      console.log('❌ Auth error:', e);
+      return null;
+    }
   }
 
   // Step 1: obtain request token and redirect user to X authorize
@@ -431,20 +428,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Logout: clear server-side session and instruct client to remove cookie
   app.post("/auth/logout", async (req, res) => {
     try {
-      const cookieHeader = String(req.headers.cookie || "");
-      const cookieName = process.env.SESSION_COOKIE_NAME || "nexura_sid";
-
-      // simple cookie parse
-      const match = cookieHeader.split(/;\s*/).find((c) => c.startsWith(cookieName + "="));
-      if (match) {
-        const token = match.split('=')[1];
-        if (token && sessions.has(token)) sessions.delete(token);
+      const sess = getSessionFromReq(req);
+      // Destroy server-side cookie session if present
+      try {
+        if ((req as any).session) {
+          (req as any).session.destroy?.(() => {});
+        }
+      } catch (e) {
+        console.warn('failed to destroy server session', e);
       }
 
-      // clear cookie on client
-      const isProd = process.env.NODE_ENV === "production";
-      // Use same options as when setting the cookie so clearCookie matches correctly
-      res.clearCookie(cookieName, { path: "/", httpOnly: true, sameSite: "lax", secure: isProd });
+      // Remove legacy bearer token if present
+      if (sess && sess.token && sessions.has(sess.token)) {
+        sessions.delete(sess.token);
+      }
+
       return res.json({ success: true });
     } catch (err) {
       console.error("logout failed", err);
@@ -452,20 +450,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Return profile for authenticated session (cookie-based)
+  // Return profile for authenticated session (bearer-based)
   app.get("/profile", async (req, res) => {
     try {
-      const cookieHeader = String(req.headers.cookie || "");
-      const cookieName = process.env.SESSION_COOKIE_NAME || "nexura_sid";
-      const match = cookieHeader.split(/;\s*/).find((c) => c.startsWith(cookieName + "="));
-      if (!match) return res.status(401).json({ error: "not authenticated" });
-      const token = match.split("=")[1];
-      if (!token) return res.status(401).json({ error: "not authenticated" });
-      const s = sessions.get(token);
-      if (!s) return res.status(401).json({ error: "invalid session" });
+      const sess = getSessionFromReq(req);
+      if (!sess) return res.status(401).json({ error: "not authenticated" });
 
       // Try to fetch user by address from storage
-      const user = await storage.getUserByAddress(s.address);
+      const user = await storage.getUserByAddress(sess.session.address);
       if (!user) {
         // Authenticated but no user record yet; return empty object so client
         // can render defaults client-side.
@@ -497,16 +489,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Return combined user + profile info for the authenticated session
   app.get("/api/me", async (req, res) => {
     try {
-      const cookieHeader = String(req.headers.cookie || "");
-      const cookieName = process.env.SESSION_COOKIE_NAME || "nexura_sid";
-      const match = cookieHeader.split(/;\s*/).find((c) => c.startsWith(cookieName + "="));
-      if (!match) return res.status(401).json({ error: "not authenticated" });
-      const token = match.split("=")[1];
-      if (!token) return res.status(401).json({ error: "not authenticated" });
-      const s = sessions.get(token);
-      if (!s) return res.status(401).json({ error: "invalid session" });
+      const sess = getSessionFromReq(req);
+      if (!sess) return res.status(401).json({ error: "not authenticated" });
 
-      const user = await storage.getUserByAddress(s.address);
+      const user = await storage.getUserByAddress(sess.session.address);
       if (!user) return res.json({ user: null, hasProfile: false, hasProject: false });
       const profile = await storage.getUserProfile(user.id);
 
@@ -514,7 +500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let projects = [] as any[];
       try {
         const all = await storage.listProjects();
-        const lower = String(s.address).toLowerCase();
+        const lower = String(sess.session.address).toLowerCase();
         projects = all.filter((p: any) => {
           const ownerAddr = (p.ownerAddress || p.owner_address || "").toString().toLowerCase();
           const ownerUserId = p.ownerUserId || p.owner_user_id || p.ownerUserId || null;
@@ -554,6 +540,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/upload/avatar", async (req, res) => {
     try {
       const sess = getSessionFromReq(req);
+      // Log auth info for debugging upload failures (server session preferred)
+      try {
+        console.log('/api/upload/avatar headers:', { authorization: req.headers.authorization });
+        if ((req as any).session && (req as any).session.address) {
+          console.log('/api/upload/avatar server session address:', (req as any).session.address);
+        } else {
+          const authHeader = String(req.headers.authorization || '');
+          const token = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.split(/\s+/)[1] : null;
+          console.log('/api/upload/avatar bearer token present?', !!token, 'sessionsCount=', sessions.size);
+          if (token && sessions.has(token)) {
+            console.log('/api/upload/avatar session for token:', sessions.get(token));
+          }
+        }
+      } catch (logErr) {
+        console.warn('failed to log upload auth info', logErr);
+      }
+
       if (!sess?.session) return res.status(401).json({ error: "not authenticated" });
       
       const { imageData, fileName } = req.body || {};
@@ -561,25 +564,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "imageData required as base64 or data URL" });
       }
       
-      return res.json({ success: true, url: imageData });
+      // Extract base64 data (remove data:image/...;base64, prefix if present)
+      const base64Match = imageData.match(/^data:image\/[^;]+;base64,(.+)$/);
+      const base64Data = base64Match ? base64Match[1] : imageData;
+      
+      // Generate unique filename
+      const ext = fileName?.split('.').pop() || 'png';
+      const uniqueName = `avatar-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+      
+      // Create uploads directory if it doesn't exist
+      const uploadsDir = path.join(process.cwd(), 'uploads', 'avatars');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      
+      // Save file
+      const filePath = path.join(uploadsDir, uniqueName);
+      fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+      
+      // Return public URL
+      const publicUrl = `/uploads/avatars/${uniqueName}`;
+      
+      return res.json({ success: true, url: publicUrl });
     } catch (e) {
       console.error("/api/upload/avatar error", e);
-      return res.status(500).json({ error: "upload failed" });
+      return res.status(500).json({ error: "upload failed", detail: (e && (e as any).message) || String(e) });
     }
   });
 
   app.put("/api/users/profile", async (req, res) => {
     try {
-      const cookieHeader = String(req.headers.cookie || "");
-      const cookieName = process.env.SESSION_COOKIE_NAME || "nexura_sid";
-      const match = cookieHeader.split(/;\s*/).find((c) => c.startsWith(cookieName + "="));
-      if (!match) return res.status(401).json({ error: "not authenticated" });
-      const token = match.split("=")[1];
-      if (!token) return res.status(401).json({ error: "not authenticated" });
-      const s = sessions.get(token);
-      if (!s) return res.status(401).json({ error: "invalid session" });
+      const sess = getSessionFromReq(req);
+      if (!sess) return res.status(401).json({ error: "not authenticated" });
 
-      const user = await storage.getUserByAddress(s.address);
+      const user = await storage.getUserByAddress(sess.session.address);
       if (!user) return res.status(404).json({ error: "user not found" });
 
       const { displayName, avatar, socialProfiles } = req.body || {};
@@ -986,6 +1004,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: "failed to fetch tasks" });
     }
   });
+
+    // Quests API: list completed quests for a user
+    app.get('/api/quests/completed/:userId', async (req, res) => {
+      try {
+        const { userId } = req.params;
+        if (!userId) return res.status(400).json({ error: 'userId required' });
+        const completed = await storage.getUserCompletedQuests(userId);
+        return res.json({ completed });
+      } catch (e) {
+        console.error('[GET /api/quests/completed/:userId] error', e);
+        return res.status(500).json({ error: 'failed to fetch completed quests' });
+      }
+    });
+
+    // Quests API: claim a quest (wrapper over /api/xp/add) - ensures idempotency and returns updated profile
+    app.post('/api/quests/claim', async (req, res) => {
+      try {
+        const { userId, questId, xp } = req.body || {};
+        if (!userId || !questId || typeof xp !== 'number') return res.status(400).json({ error: 'userId, questId and numeric xp required' });
+
+        // Check duplicate
+        const already = await storage.isQuestCompleted(userId, questId);
+        if (already) return res.status(409).json({ error: 'Quest already claimed' });
+
+        // Record completion and award xp (atomic at application level for MemStorage)
+        try {
+          await storage.recordQuestCompletion(userId, questId, xp);
+        } catch (e: any) {
+          const isDuplicate = e?.code === 'DUPLICATE_QUEST_COMPLETION' || e?.code === '23505' || e?.message?.includes('duplicate');
+          if (isDuplicate) return res.status(409).json({ error: 'Quest already claimed' });
+          console.error('[POST /api/quests/claim] recordQuestCompletion failed', e);
+          return res.status(500).json({ error: 'failed to record quest completion' });
+        }
+
+        const result = await storage.addXpToUser(userId, xp, { questsCompletedInc: 1 });
+
+        return res.json({ success: true, result });
+      } catch (e) {
+        console.error('[POST /api/quests/claim] error', e);
+        return res.status(500).json({ error: 'failed to claim quest' });
+      }
+    });
 
   app.put("/api/campaigns/:campaignId/tasks/:taskId", async (req, res) => {
     try {

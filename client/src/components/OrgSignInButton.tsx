@@ -31,7 +31,7 @@ export default function OrgSignInButton() {
       close();
       // After successful wallet connect, ask the server for user+profile
       try {
-        const meRes = await fetch(`/api/me`, { credentials: "include" });
+        const meRes = await fetch(buildUrl(`/api/me`));
         if (meRes.ok) {
           const json = await meRes.json().catch(() => ({}));
           // If this wallet owns a project, go directly to that project's dashboard.

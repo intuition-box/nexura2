@@ -66,23 +66,8 @@ export default function ProfileBar({ userId = "user-123" }: ProfileBarProps) {
     } catch (e) {
       /* ignore */
     }
-    // Attempt to wipe all non-httpOnly cookies on the client. httpOnly cookies
-    // (like the session cookie) are cleared server-side by the /auth/logout call
-    // in signOut(). This is best-effort for any remaining client-set cookies.
-    try {
-      if (typeof document !== "undefined") {
-  const cookies = document.cookie.split("; ").map((c) => c.split("=")[0]);
-        cookies.forEach((name) => {
-          try {
-            document.cookie = `${name}=; Max-Age=0; path=/;`; // expire
-          } catch (e) {
-            /* ignore */
-          }
-        });
-      }
-    } catch (e) {
-      /* ignore */
-    }
+    // Clients should clear any local session storage. The server no longer
+    // sets auth cookies; authentication is bearer-token based (localStorage).
     // SPA navigate to root and show toast
     setLocation("/");
     toast({ title: "Signed out", description: "Your session was cleared." });
