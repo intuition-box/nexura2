@@ -30,7 +30,7 @@ export default function SignUpPopup({ mode = "user" as "user" | "project", actio
         try {
           // ping /api/me to let server create a minimal user via /auth/wallet if needed
           // The server will create a user on /auth/wallet; here we'll call /api/me to detect profile
-          const meRes = await fetch(buildUrl(`/api/me`));
+          const meRes = await fetch(buildUrl(`/api/me`), { credentials: 'include' });
           if (meRes.ok) {
             const json = await meRes.json().catch(() => ({}));
             setOpen(false);
@@ -65,7 +65,7 @@ export default function SignUpPopup({ mode = "user" as "user" | "project", actio
         }
         // check if the user already has projects
         try {
-          const res = await fetch(buildUrl(`/projects`));
+          const res = await fetch(buildUrl(`/projects`), { credentials: 'include' });
           if (res.ok) {
             const list = await res.json();
             const my = list.find((p: any) => p.ownerAddress && p.ownerAddress.toLowerCase() === (connectedAddress || "").toLowerCase());

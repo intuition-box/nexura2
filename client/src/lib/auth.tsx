@@ -46,8 +46,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Use regular fetch instead of apiRequest to avoid thrown errors
+        // Include credentials so server-side cookie sessions are sent.
         const res = await fetch(buildUrl("/api/me"), {
-          headers
+          headers,
+          credentials: 'include',
         }).catch(err => {
           console.warn("Network error fetching profile:", err);
           return null;
@@ -110,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const headers: Record<string, string> = { "Content-Type": "application/json" };
         const token = getSessionToken();
         if (token) headers["Authorization"] = `Bearer ${token}`;
-        const res = await fetch(buildUrl("/api/me"), { headers });
+        const res = await fetch(buildUrl("/api/me"), { headers, credentials: 'include' });
 
         if (res.ok) {
           const json = await res.json();

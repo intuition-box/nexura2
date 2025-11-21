@@ -23,6 +23,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Debug endpoint to inspect incoming cookies and session contents.
+  // Disabled by default in production. To enable in any environment, set
+  // DEBUG_SESSION_SECRET in the environment and supply the same value in
+  // the `X-Debug-Secret` request header when calling this endpoint.
+  app.get('/api/debug-session', (req, res) => {
+    const secret = process.env.DEBUG_SESSION_SECRET || null;
+    if (!secret) return res.status(404).json({ error: 'not available' });
+    const provided = String(req.get('x-debug-secret') || '');
+    if (provided !== secret) return res.status(403).json({ error: 'forbidden' });
+
+    try {
+      const info = {
+        headers: req.headers,
+        cookieHeader: req.headers.cookie || null,
+        session: (req as any).session || null,
+        sessionID: (req as any).sessionID || null,
+      };
+      return res.json(info);
+    } catch (e) {
+      return res.status(500).json({ error: 'failed', details: String(e) });
+    }
+  });
+
   // Referral system routes
   app.get("/api/referrals/stats/:userId", async (req, res) => {
     try {
@@ -147,12 +170,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ensure a user record exists for this address so /profile can return user data.
       try {
         const addrLower = String(address).toLowerCase();
-        const existing = await storage.getUserByAddress(addrLower);
-        if (!existing) {
+        let user = await storage.getUserByAddress(addrLower);
+        if (!user) {
           // create a lightweight user record keyed by address
           const randPwd = crypto.randomBytes(12).toString("hex");
           // We include an `address` field so MemStorage and other storage impls can look it up
-          await storage.createUser({ username: addrLower, password: randPwd, address: addrLower } as any);
+          user = await storage.createUser({ username: addrLower, password: randPwd, address: addrLower } as any);
+        }
+
+        // Persist the canonical reference to the user id on the server-side session.
+        // This allows the rest of the app to rely on a stable DB primary key rather
+        // than just an address string and makes server-side sessions fully DB-backed
+        // (session store persists session JSON; user record persists in storage).
+        try {
+          (req as any).session.userId = (user as any).id || null;
+          (req as any).session.address = addrLower;
+          (req as any).session.createdAt = Date.now();
+        } catch (e) {
+          console.warn('failed to set cookie session (userId)', e);
         }
       } catch (e) {
         console.warn("failed to ensure user record for address", e);
@@ -185,11 +220,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Primary: server-side cookie session (express-session)
       try {
-        if (req.session && req.session.address) {
-          const token = req.sessionID || null;
-          const sessionObj = { address: String(req.session.address).toLowerCase(), createdAt: req.session.createdAt || Date.now() };
-          console.log(`✅ Auth via server-side session for ${String(sessionObj.address).substring(0,10)}...`);
-          return { token, session: sessionObj };
+        if (req.session) {
+          // Prefer a canonical DB user id stored on the session when available
+          const userId = req.session.userId || null;
+          const address = req.session.address ? String(req.session.address).toLowerCase() : null;
+          if (userId || address) {
+            const token = req.sessionID || null;
+            const sessionObj: any = { createdAt: req.session.createdAt || Date.now() };
+            if (userId) sessionObj.userId = userId;
+            if (address) sessionObj.address = address;
+            console.log(`✅ Auth via server-side session for ${userId ? `userId=${String(userId).substring(0,10)}` : String(address).substring(0,10)}...`);
+            return { token, session: sessionObj };
+          }
         }
       } catch (e) {
         console.warn('session check failed', e);
@@ -303,8 +345,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // look up user by address
-      const user = await storage.getUserByAddress((s as any).address);
-      const userId = user ? user.id : null;
+      let user = null;
+      let userId = null;
+      if ((s as any).session?.userId) {
+        user = await storage.getUser((s as any).session.userId);
+        userId = user ? user.id : null;
+      } else {
+        user = await storage.getUserByAddress((s as any).address);
+        userId = user ? user.id : null;
+      }
       if (!userId) {
         // create a lightweight user for this address if needed
         // attempt to create or skip
@@ -330,7 +379,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sess = getSessionFromReq(req);
       if (!sess || !sess.session) return res.status(401).json({ error: 'not authenticated' });
-      const user = await storage.getUserByAddress(sess.session.address);
+      let user = null;
+      if (sess.session.userId) {
+        user = await storage.getUser(sess.session.userId);
+      } else {
+        user = await storage.getUserByAddress(sess.session.address);
+      }
       if (!user) return res.status(400).json({ error: 'no user' });
       const token = await storage.getOAuthToken(user.id, 'twitter');
       if (!token) return res.status(403).json({ error: 'no-twitter-token' });
@@ -366,7 +420,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sess = getSessionFromReq(req);
       if (!sess || !sess.session) return res.status(401).json({ error: 'not authenticated' });
-      const user = await storage.getUserByAddress(sess.session.address);
+      let user = null;
+      if (sess.session.userId) {
+        user = await storage.getUser(sess.session.userId);
+      } else {
+        user = await storage.getUserByAddress(sess.session.address);
+      }
       if (!user) return res.status(400).json({ error: 'no user' });
       const token = await storage.getOAuthToken(user.id, 'twitter');
       if (!token) return res.status(403).json({ error: 'no-twitter-token' });
@@ -397,7 +456,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sess = getSessionFromReq(req);
       if (!sess || !sess.session) return res.status(401).json({ error: 'not authenticated' });
-      const user = await storage.getUserByAddress(sess.session.address);
+      let user = null;
+      if (sess.session.userId) {
+        user = await storage.getUser(sess.session.userId);
+      } else {
+        user = await storage.getUserByAddress(sess.session.address);
+      }
       if (!user) return res.status(400).json({ error: 'no user' });
       const token = await storage.getOAuthToken(user.id, 'twitter');
       if (!token) return res.status(403).json({ error: 'no-twitter-token' });
@@ -456,8 +520,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sess = getSessionFromReq(req);
       if (!sess) return res.status(401).json({ error: "not authenticated" });
 
-      // Try to fetch user by address from storage
-      const user = await storage.getUserByAddress(sess.session.address);
+      // Try to fetch user from DB using userId stored on session when available,
+      // falling back to address lookup for backward compatibility.
+      let user = null;
+      if (sess.session.userId) {
+        user = await storage.getUser(sess.session.userId);
+      } else {
+        user = await storage.getUserByAddress(sess.session.address);
+      }
       if (!user) {
         // Authenticated but no user record yet; return empty object so client
         // can render defaults client-side.
@@ -492,7 +562,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sess = getSessionFromReq(req);
       if (!sess) return res.status(401).json({ error: "not authenticated" });
 
-      const user = await storage.getUserByAddress(sess.session.address);
+      let user = null;
+      if (sess.session.userId) {
+        user = await storage.getUser(sess.session.userId);
+      } else {
+        user = await storage.getUserByAddress(sess.session.address);
+      }
       if (!user) return res.json({ user: null, hasProfile: false, hasProject: false });
       const profile = await storage.getUserProfile(user.id);
 
@@ -597,7 +672,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sess = getSessionFromReq(req);
       if (!sess) return res.status(401).json({ error: "not authenticated" });
 
-      const user = await storage.getUserByAddress(sess.session.address);
+      let user = null;
+      if (sess.session.userId) {
+        user = await storage.getUser(sess.session.userId);
+      } else {
+        user = await storage.getUserByAddress(sess.session.address);
+      }
       if (!user) return res.status(404).json({ error: "user not found" });
 
       const { displayName, avatar, socialProfiles } = req.body || {};
@@ -1105,7 +1185,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sess?.session) return res.status(401).json({ error: "not authenticated" });
       
       const { campaignId, taskId } = req.params;
-      const user = await storage.getUserByAddress(sess.session.address);
+      let user = null;
+      if (sess.session.userId) {
+        user = await storage.getUser(sess.session.userId);
+      } else {
+        user = await storage.getUserByAddress(sess.session.address);
+      }
       if (!user) return res.status(404).json({ error: "user not found" });
       
       const task = await storage.getCampaignTask(taskId);

@@ -68,7 +68,15 @@ app.use((req, res, next) => {
   // CORS configuration. In production, prefer an explicit FRONTEND_URL so we
   // can enable credentialed cookie-based sessions. In development we allow
   // any origin to simplify testing (no credentials).
-  const FRONTEND_URL = process.env.FRONTEND_URL || process.env.VITE_FRONTEND_URL || null;
+  // Normalize configured frontend origin to avoid accidental mismatches
+  // (some deploy dashboards allow a trailing slash which breaks exact origin
+  // comparison). We also allow an explicit FRONTEND_URL to enable credentialed
+  // cookie requests in production.
+  let FRONTEND_URL = process.env.FRONTEND_URL || process.env.VITE_FRONTEND_URL || null;
+  if (typeof FRONTEND_URL === 'string') {
+    FRONTEND_URL = FRONTEND_URL.trim().replace(/\/+$/g, "");
+  }
+
   if (process.env.NODE_ENV === 'production' && FRONTEND_URL) {
     res.setHeader('Access-Control-Allow-Origin', FRONTEND_URL);
     res.setHeader('Access-Control-Allow-Credentials', 'true');

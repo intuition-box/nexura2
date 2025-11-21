@@ -93,7 +93,7 @@ export async function createUserFromWallet(payload: User) {
       if (token) headers['Authorization'] = `Bearer ${token}`;
     } catch (e) { /* ignore */ }
 
-      const res = await fetch(buildUrl(`/api/me`), { method: "GET", headers });
+      const res = await fetch(buildUrl(`/api/me`), { method: "GET", headers, credentials: 'include' });
     if (res.ok) return res.json();
   } catch (e) {
     // ignore
