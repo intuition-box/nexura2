@@ -69,11 +69,6 @@ export default function EditProfile() {
         
         // If an avatar was selected, upload it
         if ((profileData as any).avatarFile) {
-          // Ensure we have an access token before attempting upload
-          if (!getSessionToken()) {
-            toast({ title: "Not signed in", description: "Please connect your wallet or sign in before uploading an avatar.", variant: "destructive" });
-            return;
-          }
           const file: File = (profileData as any).avatarFile;
           avatarUrl = await uploadFile(file, `avatars/${user?.id ?? 'guest'}`);
         }
@@ -88,18 +83,13 @@ export default function EditProfile() {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         try {
           const token = localStorage.getItem('accessToken');
-          if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-            console.log("🔑 Sending Authorization header for profile update");
-          } else {
-            console.log("❌ No accessToken found for profile update");
-          }
+          if (token) headers['Authorization'] = `Bearer ${token}`;
         } catch (e) { /* ignore */ }
 
         const res = await fetch(buildUrl('/api/users/profile'), {
           method: 'PUT',
           headers,
-          // Use Authorization bearer token in headers; server no longer relies on cookies
+          credentials: 'include',
           body: JSON.stringify(updatePayload)
         });
 
