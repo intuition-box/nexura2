@@ -89,8 +89,12 @@ export async function initAppKit(projectId?: string) {
       icons: [],
     } as any;
 
-    try {
-      _modal = createAppKit({
+      try {
+      // createAppKit may return a promise that rejects asynchronously if the
+      // project hasn't been authorized for this origin. Await it so we can
+      // catch that rejection and return a safe no-op modal instead of letting
+      // the rejection bubble as an unhandled promise rejection in production.
+      _modal = await createAppKit({
         adapters: [wagmiAdapter],
         networks: networks as any,
         metadata,
@@ -104,7 +108,7 @@ export async function initAppKit(projectId?: string) {
       // isn't authorized for this origin. Provide a safe no-op modal so the
       // rest of the app (wallet logic) can continue to function without crashing.
       // eslint-disable-next-line no-console
-      console.warn("AppKit create failed, falling back to no-op modal:", innerErr);
+      console.warn("AppKit create failed or authorization missing, falling back to no-op modal:", innerErr);
       const noopModal = {
         isAvailable: false,
         open: () => {

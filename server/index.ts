@@ -28,11 +28,19 @@ app.use(express.urlencoded({ extended: false }));
   const pgConnection = process.env.DATABASE_URL || process.env.PG_CONNECTION_STRING || null;
   const PgSession = connectPgSimple(session as any);
   let sessionStore: any = undefined;
+  let pgPool: any = undefined;
 
   try {
     if (pgConnection) {
-      const pgPool = new pg.Pool({ connectionString: pgConnection });
+      pgPool = new pg.Pool({ connectionString: pgConnection });
       sessionStore = new PgSession({ pool: pgPool });
+      // ensure session table exists to avoid runtime errors in production
+      try {
+        const createSql = `CREATE TABLE IF NOT EXISTS session (sid varchar NOT NULL, sess json NOT NULL, expire timestamp(6) NOT NULL); CREATE INDEX IF NOT EXISTS IDX_session_expire ON session (expire);`;
+        await pgPool.query(createSql);
+      } catch (pgErr) {
+        console.warn('Could not ensure session table exists:', pgErr && pgErr.message ? pgErr.message : pgErr);
+      }
     }
   } catch (e) {
     console.warn("Failed to initialize Postgres session store, falling back to in-memory store", e);
@@ -49,7 +57,7 @@ app.use(express.urlencoded({ extended: false }));
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
         sameSite: "lax",
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+        maxAge: 1000 * 60 * 60 * 24 * 7,
       },
     }) as any,
   );

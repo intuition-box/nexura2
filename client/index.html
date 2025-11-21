@@ -14,10 +14,22 @@
     <div id="root"></div>
     <!-- Runtime backend URL injection: replace the placeholder with your API URL or have your server inject it -->
     <script>
-      // For local/dev testing on your LAN host, set the API to your machine's address.
-      // The API server listens on port 5051 by default; point the client there so
-      // the app calls the backend API instead of the dev server or the placeholder.
-      window.__BACKEND_URL__ = window.__BACKEND_URL__ || "http://172.20.10.3:5051";
+      // Runtime BACKEND_URL: prefer an already-injected value. If not present,
+      // prefer the current origin when served over HTTPS (production), otherwise
+      // fall back to the developer LAN API for local testing.
+      (function(){
+        try {
+          if (window.__BACKEND_URL__) return;
+          var origin = (window.location && window.location.origin) ? window.location.origin : undefined;
+          if (origin && origin.startsWith('https:')) {
+            window.__BACKEND_URL__ = origin;
+          } else {
+            window.__BACKEND_URL__ = "http://172.20.10.3:5051";
+          }
+        } catch (e) {
+          window.__BACKEND_URL__ = "http://172.20.10.3:5051";
+        }
+      })();
     </script>
     <script type="module" src="/src/main.tsx"></script>
     <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->

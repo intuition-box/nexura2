@@ -132,8 +132,31 @@
   if (typeof window !== 'undefined') {
     const provider = new MockEthereumProvider();
     
-    // Standard injection
-    window.ethereum = provider;
+    // Standard injection: only inject if a provider is not already present
+    try {
+      const existingDesc = Object.getOwnPropertyDescriptor(window, 'ethereum');
+      if (typeof window.ethereum !== 'undefined') {
+        console.warn('window.ethereum already present, skipping mock injection');
+      } else if (existingDesc && (!existingDesc.writable || !existingDesc.configurable)) {
+        // Some environments expose a getter-only ethereum property — avoid throwing
+        // by not attempting to overwrite it. Instead expose the mock under a
+        // non-conflicting name so tests can still access it if necessary.
+        console.warn('window.ethereum exists as a non-writable property; exposing mock as window.__mockEthereum');
+        (window as any).__mockEthereum = provider;
+      } else {
+        // Safe to assign directly
+        window.ethereum = provider;
+      }
+    } catch (e) {
+      // If any environment throws when inspecting or setting, fall back to
+      // exposing the mock under a unique name to avoid breaking the page.
+      try {
+        (window as any).__mockEthereum = provider;
+        console.warn('Failed to inject mock provider to window.ethereum; mock exposed as window.__mockEthereum', e);
+      } catch (ee) {
+        console.error('Failed to expose mock provider', ee);
+      }
+    }
     
     // Also set as web3 provider for compatibility
     if (typeof window.web3 === 'undefined') {
