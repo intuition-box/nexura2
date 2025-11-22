@@ -7,21 +7,35 @@ const WALLETS_BASE = import.meta.env.VITE_WALLETS_API_URL || "";
 const PROJECTS_BASE = import.meta.env.VITE_PROJECTS_API_URL || "";
 
 // Use Vite env var if provided, otherwise fall back to the deployed backend URL.
-// `import.meta.env` may not be typed in this project, so access defensively.
-// Prefer configured Vite env var; fallback to localhost for dev instead of the deployed Render URL
-const BACKEND_BASE = ((import.meta as any).env?.VITE_BACKEND_URL as string) ||
-  "http://localhost:5051";
+// Do NOT default to localhost in source — leave empty so the app will use
+// the current origin when no backend is configured.
+const BACKEND_BASE = ((import.meta as any).env?.VITE_BACKEND_URL as string) || "";
 
 function buildUrl(path: string) {
   if (/^https?:\/\//i.test(path)) return path;
-  const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
+  const base = (BACKEND_BASE || "").replace(/\/+$/g, "");
   const p = path.replace(/^\/+/, "");
   return `${base}/${p}`;
 }
 
 async function safeFetch(url: string, opts: any) {
   const fullUrl = url.startsWith('http') ? url : buildUrl(url);
-  const res = await fetch(fullUrl, opts);
+  const finalOpts = { ...(opts || {}) };
+  try {
+    // If this is a same-origin or relative request, include credentials so cookie-based
+    // sessions are sent to the backend. Avoid sending credentials to arbitrary external
+    // third-party endpoints.
+    if (typeof window !== 'undefined') {
+      const isRelative = fullUrl.startsWith('/');
+      const isSameOrigin = fullUrl.startsWith(window.location.origin);
+      if (isRelative || isSameOrigin) {
+        finalOpts.credentials = finalOpts.credentials || 'include';
+      }
+    }
+  } catch (e) {
+    // ignore and proceed without credentials
+  }
+  const res = await fetch(fullUrl, finalOpts);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Remote DB error ${res.status}: ${text}`);

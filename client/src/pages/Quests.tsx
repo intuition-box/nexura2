@@ -14,15 +14,16 @@ import AnimatedBackground from "@/components/AnimatedBackground";
 import dailyQuestImg from "@assets/generated_images/Daily_Quest_Completion_Image_83de888a.png";
 import gettingStartedImg from "@assets/generated_images/Getting_Started_Quest_Image_9a7ae50b.png";
 
-// Use Vite env var if provided, otherwise fall back to the deployed backend URL.
-// `import.meta.env` may not be typed in this project, so access defensively.
-// Prefer configured Vite env var; fallback to localhost for dev instead of the deployed Render URL
-const BACKEND_BASE = ((import.meta as any).env?.VITE_BACKEND_URL as string) ||
-  "http://localhost:5051";
+// Prefer a runtime-injected backend URL (window.__BACKEND_URL__), then build-time Vite env var,
+// otherwise fall back to localhost for developer convenience. This mirrors the logic used
+// elsewhere in the app so the same bundle can work across environments when the host
+// injects `window.__BACKEND_URL__`.
+const RUNTIME_BACKEND = (typeof window !== 'undefined' && (window as any).__BACKEND_URL__) || undefined;
+const BACKEND_BASE = RUNTIME_BACKEND || ((import.meta as any).env?.VITE_BACKEND_URL as string) || "";
 
 function buildUrl(path: string) {
   if (/^https?:\/\//i.test(path)) return path;
-  const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
+  const base = (BACKEND_BASE || "").replace(/\/+$/g, "");
   const p = path.replace(/^\/+/, "");
   return `${base}/${p}`;
 }
@@ -59,7 +60,7 @@ export default function Quests() {
           if (token) headers['Authorization'] = `Bearer ${token}`;
         } catch (e) { /* ignore localStorage errors */ }
 
-        const res = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers });
+        const res = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers, credentials: 'include' });
         if (!res.ok) return;
         const json = await res.json().catch(() => ({}));
         const serverCompleted: string[] = Array.isArray(json?.completed) ? json.completed : [];
@@ -369,6 +370,7 @@ export default function Quests() {
       const resp = await fetch(buildUrl('/api/xp/add'), {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify({ userId: user.id, xp: xpAmount, questId: quest.id, questsCompletedDelta, tasksCompletedDelta }),
       });
 
@@ -380,7 +382,7 @@ export default function Quests() {
           const headers2: Record<string, string> = { "Content-Type": "application/json" };
           const token2 = localStorage.getItem('accessToken');
           if (token2) headers2['Authorization'] = `Bearer ${token2}`;
-          const r = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers: headers2 });
+          const r = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers: headers2, credentials: 'include' });
           if (r.ok) {
             const j = await r.json().catch(() => ({}));
             const serverCompleted = Array.isArray(j?.completed) ? j.completed : [];
@@ -408,7 +410,7 @@ export default function Quests() {
         const headers2: Record<string, string> = { "Content-Type": "application/json" };
         const token2 = localStorage.getItem('accessToken');
         if (token2) headers2['Authorization'] = `Bearer ${token2}`;
-        const r = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers: headers2 });
+        const r = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers: headers2, credentials: 'include' });
         if (r.ok) {
           const j = await r.json().catch(() => ({}));
           const serverCompleted = Array.isArray(j?.completed) ? j.completed : [];

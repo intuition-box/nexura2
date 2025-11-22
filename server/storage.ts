@@ -492,7 +492,7 @@ export class MemStorage implements IStorage {
       totalReferrals,
       totalEarned: 0,
       claimableRewards: 0,
-      referralLink: `${process.env.APP_URL || 'http://localhost:5051'}/ref/${userId}`,
+      referralLink: `${(process.env.APP_URL || '').replace(/\/+$/g, '')}/ref/${userId}`,
     };
   }
 

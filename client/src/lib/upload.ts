@@ -7,13 +7,14 @@ export async function uploadFile(file: File, folder = "images") {
       reader.readAsDataURL(file);
     });
 
-    // Prefer runtime-injected backend URL, then Vite env, then localhost for dev
+    // Prefer runtime-injected backend URL, then Vite env. Do NOT default to localhost here;
+    // if no backend is configured the app will perform relative requests to the current origin.
     const RUNTIME = typeof window !== 'undefined' && (window as any).__BACKEND_URL__;
-    const BACKEND_BASE = RUNTIME || ((import.meta as any).env?.VITE_BACKEND_URL as string) || "http://localhost:5051";
+    const BACKEND_BASE = RUNTIME || ((import.meta as any).env?.VITE_BACKEND_URL as string) || "";
 
     function buildUrl(path: string) {
       if (/^https?:\/\//i.test(path)) return path;
-      const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
+      const base = (BACKEND_BASE || "").replace(/\/+$/g, "");
       const p = path.replace(/^\/+/, "");
       return `${base}/${p}`;
     }

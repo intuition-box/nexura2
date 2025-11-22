@@ -3,16 +3,15 @@ import { apiRequest } from "./queryClient";
 import { setSessionToken, clearSession, getSessionToken, onSessionChange, emitSessionChange } from "./session";
 import { toast } from "@/hooks/use-toast";
 
-// Prefer a runtime-injected backend URL (window.__BACKEND_URL__), then build-time Vite env var,
-// otherwise fall back to localhost for developer convenience.
-// This allows deploying the same bundle to multiple environments by injecting
-// `window.__BACKEND_URL__` from the server/HTML without rebuilding.
+// Prefer a runtime-injected backend URL (window.__BACKEND_URL__), then build-time Vite env var.
+// Do not default to localhost here — if no backend is configured the app will make
+// relative requests to the current origin.
 const RUNTIME_BACKEND = (typeof window !== 'undefined' && (window as any).__BACKEND_URL__) || undefined;
-const BACKEND_BASE = RUNTIME_BACKEND || ((import.meta as any).env?.VITE_BACKEND_URL as string) || "http://localhost:5051";
+const BACKEND_BASE = RUNTIME_BACKEND || ((import.meta as any).env?.VITE_BACKEND_URL as string) || "";
 
 function buildUrl(path: string) {
   if (/^https?:\/\//i.test(path)) return path;
-  const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
+  const base = (BACKEND_BASE || "").replace(/\/+$/g, "");
   const p = path.replace(/^\/+/, "");
   return `${base}/${p}`;
 }

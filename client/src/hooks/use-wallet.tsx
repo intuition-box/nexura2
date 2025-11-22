@@ -2,15 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import { createWallet, requestChallenge } from "@/lib/remoteDb";
 import { setSessionToken, emitSessionChange } from "@/lib/session";
 
-// Use Vite env var if provided, otherwise fall back to the deployed backend URL.
-// `import.meta.env` may not be typed in this project, so access defensively.
-// Prefer configured Vite env var; fallback to localhost for dev instead of the deployed Render URL
-const BACKEND_BASE = ((import.meta as any).env?.VITE_BACKEND_URL as string) ||
-  "http://localhost:5051";
+// Prefer a runtime-injected backend URL (window.__BACKEND_URL__), then Vite env var.
+// Do not default to localhost here — if no backend is configured the app will
+// make relative requests to the current origin.
+const RUNTIME_BACKEND = (typeof window !== 'undefined' && (window as any).__BACKEND_URL__) || undefined;
+const BACKEND_BASE = RUNTIME_BACKEND || ((import.meta as any).env?.VITE_BACKEND_URL as string) || "";
 
 function buildUrl(path: string) {
   if (/^https?:\/\//i.test(path)) return path;
-  const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
+  const base = (BACKEND_BASE || "").replace(/\/+$/g, "");
   const p = path.replace(/^\/+/, "");
   return `${base}/${p}`;
 }
@@ -113,6 +113,7 @@ export function useWallet() {
         const verifyRes = await fetch(buildUrl('/auth/wallet'), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: 'include',
           body: JSON.stringify({ address, signature, message }),
         });
         if (verifyRes.ok) {
@@ -143,7 +144,7 @@ export function useWallet() {
       try {
         eth.on?.("accountsChanged", async (accounts: string[]) => {
           if (!accounts || accounts.length === 0) {
-            try { await fetch(buildUrl('/auth/logout'), { method: "POST" }); } catch (e) { /* ignore */ }
+            try { await fetch(buildUrl('/auth/logout'), { method: "POST", credentials: 'include' }); } catch (e) { /* ignore */ }
             try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
             try { emitSessionChange(); } catch (e) { /* ignore */ }
             try { window.location.reload(); } catch (e) { window.location.href = "/"; }
@@ -177,7 +178,7 @@ export function useWallet() {
   }, []);
 
   const disconnect = useCallback(async () => {
-    try { await fetch(buildUrl('/auth/logout'), { method: "POST" }); } catch (e) { /* ignore */ }
+    try { await fetch(buildUrl('/auth/logout'), { method: "POST", credentials: 'include' }); } catch (e) { /* ignore */ }
     try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
     try { emitSessionChange(); } catch (e) { /* ignore */ }
     setState({ isConnected: false, isConnecting: false, address: null, chainId: null });

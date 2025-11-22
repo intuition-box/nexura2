@@ -97,8 +97,9 @@ export function serveStatic(app: Express) {
       // User-provided fallback (set to production API if desired).
       // Prefer an inferred backend URL derived from the incoming request so
       // static files served on the same host will talk to the correct API.
-      // Only fall back to localhost:5051 if nothing else is available.
-      const userFallback = "http://localhost:5051";
+      // Do not hard-code a localhost fallback here; if nothing is provided we
+      // will inject an empty string and let the client decide (relative requests).
+      const userFallback = "";
       const backendUrl = envUrl || inferred || userFallback;
 
       const script = `<script>window.__BACKEND_URL__ = ${JSON.stringify(
