@@ -13,6 +13,33 @@ const DEFAULT_PROJECT_ID = "fb6bea018dee724957900b253ba9683c";
 export async function initAppKit(projectId?: string) {
   if (typeof window === "undefined") return null;
   if (_modal !== undefined) return _modal;
+  // In production we only initialize AppKit if an explicit project id is provided
+  // via runtime injection (window.__REOWN_PROJECT_ID) or via Vite env var
+  // `VITE_REOWN_PROJECT_ID`. This prevents unhandled origin-authorization
+  // rejections on deployed domains which are not registered in the AppKit
+  // project dashboard. If you want AppKit in production, set
+  // VITE_REOWN_PROJECT_ID or window.__REOWN_PROJECT_ID to your project id.
+  try {
+    const hasRuntimePid = typeof window !== 'undefined' && !!(window as any).__REOWN_PROJECT_ID;
+    const hasBuildPid = (import.meta as any).env && !!(import.meta as any).env.VITE_REOWN_PROJECT_ID;
+    const isProd = (import.meta as any).env && !!(import.meta as any).env.PROD;
+    if (isProd && !hasRuntimePid && !hasBuildPid) {
+      // Don't attempt to initialize AppKit in production if not configured
+      // — return a safe no-op modal instead to avoid noisy errors.
+      const noopModal = {
+        isAvailable: false,
+        open: () => {
+          // eslint-disable-next-line no-console
+          console.warn("Attempted to open AppKit modal but AppKit is disabled in production (no project id configured).");
+        },
+        close: () => {},
+      } as any;
+      _modal = noopModal;
+      return _modal;
+    }
+  } catch (e) {
+    // ignore
+  }
   // Add a targeted handler to suppress the specific authorization rejection
   // emitted by AppKit when the project hasn't been authorized for this origin.
   // We only suppress the message to prevent noisy unhandled promise rejections
