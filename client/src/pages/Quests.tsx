@@ -89,6 +89,32 @@ export default function Quests() {
   // Server-provided canonical quests (replace hardcoded arrays)
   const [quests, setQuests] = useState<any[]>([]);
 
+  // Local default quests: always show these in the UI as a fallback so the
+  // quests list is visible even when the backend /api/quests is unavailable.
+  // XP awarding and completed/claim state remain authoritative on the server.
+  const DEFAULT_QUESTS: any[] = [
+    { id: 'daily-task-1', title: 'Verify Your Identity', description: 'Complete your identity verification process', xp: 50, reward: '50 XP', kind: 'daily', isActive: 1 },
+    { id: 'daily-task-2', title: 'Join Community Discussion', description: 'Participate in at least one community discussion', xp: 50, reward: '50 XP', kind: 'daily', isActive: 1 },
+    { id: 'daily-task-3', title: 'Share Intuition Project', description: 'Share an Intuition project with the community', xp: 50, reward: '50 XP', kind: 'daily', isActive: 1 },
+    { id: 'daily-task-4', title: 'Create an Attestation', description: 'Make your first attestation on the Intuition platform', xp: 50, reward: '50 XP', kind: 'daily', isActive: 1 },
+
+    { id: 'onetime-x-follow', title: 'Follow on X', description: 'Follow our X account to stay updated', xp: 50, reward: '50 XP', kind: 'one-time', url: 'https://x.com/your_x_account', actionLabel: 'Follow', isActive: 1 },
+    { id: 'onetime-x-like', title: 'Like Post on X', description: 'Like our announcement post', xp: 50, reward: '50 XP', kind: 'one-time', url: 'https://x.com/your_post', actionLabel: 'Like Post', isActive: 1 },
+    { id: 'onetime-discord-join', title: 'Connect Discord', description: 'Link your Discord account', xp: 50, reward: '50 XP', kind: 'one-time', url: 'https://discord.com/oauth2/authorize', actionLabel: 'Connect Discord', isActive: 1 },
+    { id: 'onetime-join-discord', title: 'Join Discord', description: 'Join our Discord server to chat with the community', xp: 50, reward: '50 XP', kind: 'one-time', url: 'https://discord.gg/your_invite_code', actionLabel: 'Join Discord', isActive: 1 },
+
+    { id: 'std-follow-nexura', title: 'Follow Nexura on X', description: 'Follow Nexura to stay up to date', xp: 50, reward: '50 XP', kind: 'featured', url: 'https://x.com/NexuraXYZ', actionLabel: 'Follow Nexura', isActive: 1 },
+    { id: 'std-join-discord', title: 'Join Nexura Discord', description: 'Join the Nexura community on Discord and verify yourself', xp: 50, reward: '50 XP', kind: 'featured', url: 'https://discord.gg/Up7UjXrdp', actionLabel: 'Join Discord', isActive: 1 },
+    { id: 'std-complete-campaign', title: 'Complete a Campaign', description: 'Finish any campaign to qualify for Standard Quests', xp: 50, reward: '50 XP', kind: 'featured', to: '/projects', actionLabel: 'Browse Campaigns', isActive: 1 },
+
+    { id: 'quest-support-claim-1', title: 'Support or Oppose Claim A', description: 'Support or oppose this claim on Intuition', xp: 50, reward: '50 XP', kind: 'extra', url: 'https://testnet.portal.intuition.systems/explore/triple/0xb301f076ea5d81e049e5fc1bb47ee6cdf089ce79c86376053e9a2ff7f3058b7d', actionLabel: 'Open Claim', isActive: 1 },
+    { id: 'quest-support-claim-2', title: 'Support or Oppose Claim B', description: 'Support or oppose this claim on Intuition', xp: 50, reward: '50 XP', kind: 'extra', url: 'https://testnet.portal.intuition.systems/explore/atom/0x15a1eb6044c93eab63862352cbb949c22a537099f8d482e7f05d3e89d80bb1b7', actionLabel: 'Open Claim', isActive: 1 },
+
+    { id: 'camp-learn-quest', title: 'Complete at least a quest in Learn tab', description: 'Finish any Learn quest to progress campaigns', xp: 50, reward: '50 XP', kind: 'campaign', to: '/learn', actionLabel: 'Go to Learn', isActive: 1 },
+    { id: 'camp-join-socials', title: 'Join Nexura Socials', description: 'Be part of Nexura socials to unlock campaign rewards', xp: 50, reward: '50 XP', kind: 'campaign', url: 'https://x.com/NexuraXYZ', actionLabel: 'Open Socials', isActive: 1 },
+    { id: 'camp-support-claim', title: 'Support the Nexura Claim', description: 'Support the nexura claim on Intuition', xp: 50, reward: '50 XP', kind: 'campaign', url: 'https://testnet.portal.intuition.systems/explore/atom/0x985db42765efe28ba3ed6867fa7bd913955227898f6a665e34e3c9171885f1cc', actionLabel: 'Open Claim', isActive: 1 },
+  ];
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -96,9 +122,19 @@ export default function Quests() {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         try { const token = localStorage.getItem('accessToken'); if (token) headers['Authorization'] = `Bearer ${token}`; } catch(e) {}
         const res = await fetch(buildUrl('/api/quests'), { headers, credentials: 'include' });
-        if (!res.ok) return;
-        const json = await res.json().catch(() => ({}));
-        const rows = Array.isArray(json?.quests) ? json.quests : [];
+        let rows: any[] = [];
+        if (res.ok) {
+          const json = await res.json().catch(() => ({}));
+          rows = Array.isArray(json?.quests) ? json.quests : [];
+        }
+
+        // If server returns no rows or the request failed, fall back to DEFAULT_QUESTS
+        if (!rows || rows.length === 0) {
+          if (cancelled) return;
+          setQuests(DEFAULT_QUESTS);
+          return;
+        }
+
         const normalized = rows.map((r: any) => ({
           id: r.id,
           title: r.title,
