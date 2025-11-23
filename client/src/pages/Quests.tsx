@@ -220,6 +220,59 @@ export default function Quests() {
     }
   };
 
+  // Render the primary action for a quest. For external links we render a
+  // real anchor so browser default behaviors (middle-click, open in new tab,
+  // context menu) work. For internal navigation we prefer router navigation.
+  const renderActionForQuest = (q: any) => {
+    const label = q.actionLabel || 'Open';
+    // External link -> anchor
+    if (q.kind === 'external' && q.url) {
+      return (
+        <a
+          href={q.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => { e.stopPropagation(); try { markVisited(q.id); } catch(e){} }}
+          onContextMenu={(e) => { e.preventDefault(); claimAndAwardXp(q); }}
+          className="w-full inline-flex items-center justify-between px-4 py-2 rounded-md bg-primary text-white hover:opacity-95"
+          data-testid={`action-quest-${q.id}`}
+        >
+          <span>{label}</span>
+          <ArrowRight className="w-4 h-4 ml-2" />
+        </a>
+      );
+    }
+
+    // Internal route -> use setLocation for SPA navigation but preserve right-click
+    if ((q.kind === 'internal' || q.to) && q.to) {
+      return (
+        <a
+          href={q.to}
+          onClick={(e) => { e.preventDefault(); try { setLocation(q.to); } catch(e){} }}
+          className="w-full inline-flex items-center justify-between px-4 py-2 rounded-md bg-primary text-white hover:opacity-95"
+          data-testid={`action-quest-${q.id}`}
+        >
+          <span>{label}</span>
+          <ArrowRight className="w-4 h-4 ml-2" />
+        </a>
+      );
+    }
+
+    // Fallback: button that delegates to performQuestAction
+    return (
+      <Button
+        variant="default"
+        className="w-full flex items-center justify-between"
+        onClick={() => performQuestAction(q)}
+        onContextMenu={(e) => { e.preventDefault(); claimAndAwardXp(q); }}
+        data-testid={`action-quest-${q.id}`}
+      >
+        <span>{label}</span>
+        <ArrowRight className="w-4 h-4 ml-2" />
+      </Button>
+    );
+  };
+
   // Claim a quest/task locally and, if the user is signed in, persist XP to the backend
   const claimAndAwardXp = async (quest: any) => {
     if (!quest || !quest.id) return;
@@ -354,7 +407,9 @@ export default function Quests() {
 
   const performQuestAction = (quest: any) => {
     if (quest.kind === 'external' && quest.url) {
-      // open in new tab and mark completed locally
+      // legacy fallback: open in new tab and mark visited. Prefer using anchors
+      // in the UI so middle-click/right-click works — this path remains for
+      // programmatic calls but UI now renders anchors for external actions.
       try { window.open(quest.url, '_blank', 'noopener'); } catch (e) {}
       try { markVisited(quest.id); } catch(e){}
       // If this is an X social action, ask the server to verify (follow/like/retweet)
@@ -537,22 +592,7 @@ export default function Quests() {
                   <p className="text-sm text-muted-foreground">{q.description}</p>
                 </div>
                 <div className="mt-4">
-                  <Button
-                    variant="quest"
-                    className="w-full flex items-center justify-between"
-                    onClick={() => {
-                      if (q.kind === 'external' && q.url) {
-                        performQuestAction(q);
-                      } else if (q.kind === 'internal' && q.to) {
-                        try { setLocation(q.to); } catch(e){}
-                      }
-                    }}
-                    onContextMenu={(e) => { e.preventDefault(); claimAndAwardXp(q); }}
-                    title={q.actionLabel}
-                  >
-                    <span>{q.actionLabel}</span>
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
+                  {renderActionForQuest(q)}
                   {/* Claim button: enabled only after the user visited (clicked the action) and not already claimed */}
                   <div className="mt-3">
                     <Button
@@ -578,15 +618,7 @@ export default function Quests() {
                   <p className="text-sm text-muted-foreground">{q.description}</p>
                 </div>
                 <div className="mt-4">
-                  <Button
-                    variant="default"
-                    className="w-full flex items-center justify-between"
-                    onClick={() => performQuestAction(q)}
-                    onContextMenu={(e) => { e.preventDefault(); claimAndAwardXp(q); }}
-                  >
-                    <span>{q.actionLabel}</span>
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
+                  {renderActionForQuest(q)}
                   <div className="mt-3">
                     <Button
                       size="sm"
@@ -611,18 +643,7 @@ export default function Quests() {
                   <p className="text-sm text-muted-foreground">{q.description}</p>
                 </div>
                 <div className="mt-4">
-                  <Button
-                    variant="default"
-                    className="w-full flex items-center justify-between"
-                    onClick={() => {
-                      if (q.kind === 'external' && q.url) performQuestAction(q);
-                      else if (q.kind === 'internal' && q.to) try { setLocation(q.to); } catch(e){}
-                    }}
-                    onContextMenu={(e) => { e.preventDefault(); claimAndAwardXp(q); }}
-                  >
-                    <span>{q.actionLabel}</span>
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
+                  {renderActionForQuest(q)}
                   <div className="mt-3">
                     <Button
                       size="sm"
@@ -784,14 +805,7 @@ export default function Quests() {
                         <div className="font-semibold text-primary">{typeof quest.xp === 'number' ? `+${quest.xp} XP` : quest.reward}</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="default"
-                          onClick={() => performQuestAction(quest)}
-                          data-testid={`action-quest-${quest.id}`}
-                        >
-                          {quest.actionLabel || 'Open'}
-                        </Button>
+                        {renderActionForQuest(quest)}
                         <Button
                           size="sm"
                           variant={claimedTasks.includes(quest.id) ? "outline" : "quest"}

@@ -20,10 +20,21 @@ export async function initAppKit(projectId?: string) {
   // project dashboard. If you want AppKit in production, set
   // VITE_REOWN_PROJECT_ID or window.__REOWN_PROJECT_ID to your project id.
   try {
+    // Determine whether we're in production and whether a project id is
+    // available via runtime, build-time or the local DEFAULT_PROJECT_ID.
     const hasRuntimePid = typeof window !== 'undefined' && !!(window as any).__REOWN_PROJECT_ID;
     const hasBuildPid = (import.meta as any).env && !!(import.meta as any).env.VITE_REOWN_PROJECT_ID;
     const isProd = (import.meta as any).env && !!(import.meta as any).env.PROD;
-    if (isProd && !hasRuntimePid && !hasBuildPid) {
+
+    // If we're in production and no explicit project id is available from
+    // runtime or build, but a DEFAULT_PROJECT_ID is configured, allow that
+    // to be used. Previously this code disabled AppKit in prod unconditionally
+    // which prevented AppKit modal from loading on deployed sites that rely
+    // on the bundled DEFAULT_PROJECT_ID. Use the DEFAULT only when nothing
+    // else is provided.
+    const effectivePidAvailable = hasRuntimePid || hasBuildPid || !!DEFAULT_PROJECT_ID;
+
+    if (isProd && !effectivePidAvailable) {
       // Don't attempt to initialize AppKit in production if not configured
       // — return a safe no-op modal instead to avoid noisy errors.
       const noopModal = {

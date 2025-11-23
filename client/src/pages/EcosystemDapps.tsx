@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, Target, Star } from "lucide-react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
+import { emitSessionChange } from "@/lib/session";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import AnimatedBackground from "@/components/AnimatedBackground";
 
@@ -35,11 +38,14 @@ interface Dapp {
   questReward: string;
   isCompleted?: boolean;
   isClaimed?: boolean;
+  estimatedTime?: string;
   websiteUrl: string;
 }
 
 export default function EcosystemDapps() {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   const dapps: Dapp[] = [
     // Priority order: intuition portal, oracle lend, intudex, 3,3 dice game, trust name service
@@ -227,16 +233,12 @@ export default function EcosystemDapps() {
     if (event) {
       event.stopPropagation();
     }
+    try { markVisited(dapp.id); } catch(e){}
     // Open the dapp's website in a new tab
     window.open(dapp.websiteUrl, '_blank', 'noopener,noreferrer');
   };
 
   // Claim functionality removed from UI — claims are handled elsewhere or not offered
-
-  const handleCardClick = (dapp: Dapp) => {
-    // Clicking anywhere on the card opens the website
-    handleExploreClick(dapp);
-  };
 
 
   const getCategoryColor = (category: string) => {
@@ -271,6 +273,87 @@ export default function EcosystemDapps() {
     ? dapps 
     : dapps.filter(dapp => dapp.category === selectedCategory);
 
+  // Track visited and claimed state locally for UI. Authoritative state is server-side.
+  const [visitedDapps, setVisitedDapps] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('nexura:visited:dapps') || '[]'); } catch { return []; }
+  });
+  const [claimedDapps, setClaimedDapps] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('nexura:claimed:dapps') || '[]'); } catch { return []; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('nexura:visited:dapps', JSON.stringify(visitedDapps)); } catch {}
+  }, [visitedDapps]);
+  useEffect(() => {
+    try { localStorage.setItem('nexura:claimed:dapps', JSON.stringify(claimedDapps)); } catch {}
+  }, [claimedDapps]);
+
+  // Build backend URL helper (same pattern used elsewhere)
+  const RUNTIME_BACKEND = (typeof window !== 'undefined' && (window as any).__BACKEND_URL__) || undefined;
+  const BACKEND_BASE = RUNTIME_BACKEND || ((import.meta as any).env?.VITE_BACKEND_URL as string) || "";
+  function buildUrl(path: string) {
+    if (/^https?:\/\//i.test(path)) return path;
+    const base = (BACKEND_BASE || "").replace(/\/+$/g, "");
+    const p = path.replace(/^\/+/, "");
+    return `${base}/${p}`;
+  }
+
+  const markVisited = (id: string) => {
+    if (!visitedDapps.includes(id)) setVisitedDapps(prev => [...prev, id]);
+  };
+
+  const markClaimed = (id: string) => {
+    if (!claimedDapps.includes(id)) setClaimedDapps(prev => [...prev, id]);
+  };
+
+  // Helper to extract xp number from questReward like "50 XP"
+  const getXpFromReward = (reward: string) => {
+    if (!reward) return 0;
+    const m = String(reward).match(/(\d+)/);
+    return m ? Number(m[1]) : 0;
+  };
+
+  const handleClaim = async (dapp: Dapp) => {
+    if (!user || !user.id) {
+      toast({ title: 'Sign in required', description: 'Please sign in to claim XP', variant: 'destructive' });
+      return;
+    }
+    if (claimedDapps.includes(dapp.id)) {
+      toast({ title: 'Already claimed', description: 'You have already claimed this reward.' });
+      return;
+    }
+
+    const xp = getXpFromReward(dapp.questReward || '0');
+    if (xp <= 0) {
+      toast({ title: 'No XP configured', description: 'This dapp has no XP reward configured', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const headers: Record<string,string> = { 'Content-Type': 'application/json' };
+      try { const token = localStorage.getItem('accessToken'); if (token) headers['Authorization'] = `Bearer ${token}`; } catch(e){}
+      const resp = await fetch(buildUrl('/api/xp/add'), { method: 'POST', headers, credentials: 'include', body: JSON.stringify({ userId: user.id, xp, questId: dapp.id, questsCompletedDelta: 0, tasksCompletedDelta: 0 }) });
+      if (resp.status === 409) {
+        // already claimed
+        markClaimed(dapp.id);
+        toast({ title: 'Already claimed', description: 'You have already claimed this reward.' });
+        return;
+      }
+      if (!resp.ok) {
+        const t = await resp.text().catch(() => String(resp.status));
+        throw new Error(`Claim failed: ${t}`);
+      }
+      const j = await resp.json().catch(() => ({}));
+      markClaimed(dapp.id);
+      // trigger profile refresh
+      try { emitSessionChange(); } catch(e){}
+      toast({ title: 'XP awarded', description: `+${xp} XP` });
+    } catch (e) {
+      console.error('claim error', e);
+      toast({ title: 'Claim failed', description: 'Failed to claim XP. Please try again.', variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black text-white overflow-auto p-6 relative" data-testid="ecosystem-dapps-page">
       <AnimatedBackground />
@@ -303,8 +386,7 @@ export default function EcosystemDapps() {
           {filteredDapps.map((dapp) => (
             <Card 
               key={dapp.id} 
-              className="cursor-pointer hover-elevate active-elevate-2 transition-all duration-200 relative flex flex-col min-h-[300px]"
-              onClick={() => handleCardClick(dapp)}
+              className="hover-elevate active-elevate-2 transition-all duration-200 relative flex flex-col min-h-[300px]"
               data-testid={`dapp-card-${dapp.id}`}
             >
               {dapp.isCompleted && (
@@ -327,14 +409,20 @@ export default function EcosystemDapps() {
                           )}
                         </div>
                       </PopoverTrigger>
-                      <PopoverContent side="bottom" align="center" className="w-56">
+                        <PopoverContent side="bottom" align="center" className="w-56">
                         <div className="text-sm text-muted-foreground mb-2">Visit</div>
                         <div className="break-words text-sm mb-3 text-foreground font-medium">{dapp.websiteUrl}</div>
                         <div className="flex gap-2">
-                          <Button variant="default" className="flex-1" onClick={(e) => { e.stopPropagation(); handleExploreClick(dapp); }}>
+                          <a
+                            href={dapp.websiteUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => { e.stopPropagation(); markVisited(dapp.id); }}
+                            className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-md bg-primary text-white hover:opacity-90"
+                          >
                             Open
                             <ExternalLink className="w-4 h-4 ml-2" />
-                          </Button>
+                          </a>
                         </div>
                       </PopoverContent>
                     </Popover>
@@ -365,17 +453,28 @@ export default function EcosystemDapps() {
                 </div>
                 
                 <div className="flex gap-2 mt-auto">
-                  <Button 
-                    className="flex-1"
-                    variant="outline"
-                    onClick={(e) => handleExploreClick(dapp, e)}
+                  <a
+                    href={dapp.websiteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => { e.stopPropagation(); markVisited(dapp.id); }}
+                    className="flex-1 inline-flex items-center justify-center rounded-md border border-white/10 px-3 py-2 text-sm text-white hover:opacity-90"
                     data-testid={`explore-${dapp.id}`}
                   >
                     <ExternalLink className="w-4 h-4 mr-2" />
                     Explore
+                  </a>
+
+                  <Button
+                    size="sm"
+                    className="w-40"
+                    variant={claimedDapps.includes(dapp.id) ? 'outline' : 'quest'}
+                    disabled={!visitedDapps.includes(dapp.id) || claimedDapps.includes(dapp.id)}
+                    onClick={(e) => { e.stopPropagation(); handleClaim(dapp); }}
+                    data-testid={`claim-dapp-${dapp.id}`}
+                  >
+                    {claimedDapps.includes(dapp.id) ? 'Claimed' : `Claim ${dapp.questReward}`}
                   </Button>
-                  
-                  {/* Claim button removed per request */}
                 </div>
               </CardContent>
             </Card>

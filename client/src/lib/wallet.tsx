@@ -1,5 +1,6 @@
 import React from "react";
 import { initAppKit } from "./appkit";
+import { emitSessionChange } from "./session";
 
 // WalletProvider initializes the optional Reown AppKit modal so the modal
 // and Wagmi adapter are mounted at the app root. If AppKit isn't available
@@ -11,6 +12,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     // initialize AppKit and mark ready when done
     initAppKit()
       .then(() => {
+        // Notify auth layer that an optional wallet/modal integration may have
+        // changed authentication state (some adapters perform silent sign-in)
+        try { emitSessionChange(); } catch (e) { /* ignore */ }
         setIsReady(true);
       })
       .catch((err) => {

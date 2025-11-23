@@ -46,8 +46,19 @@ export default function Referrals() {
   // Note: Reward claiming functionality will be added later
 
   const handleCopyLink = () => {
-    if (referralStats?.referralLink) {
-      navigator.clipboard.writeText(referralStats.referralLink);
+    const link = referralStats?.referralLink ? (() => {
+      try {
+        const rl = referralStats.referralLink;
+        if (typeof rl === 'string' && rl.startsWith('/')) {
+          // Prefer an injected canonical app URL, fall back to current origin
+          const appUrl = (typeof window !== 'undefined' && (window as any).__APP_URL__) || (typeof window !== 'undefined' ? window.location.origin : '');
+          return `${appUrl}${rl}`;
+        }
+        return rl;
+      } catch (e) { return referralStats.referralLink; }
+    })() : null;
+    if (link) {
+      navigator.clipboard.writeText(link);
       setCopied(true);
       toast({
         title: "Link copied!",
@@ -101,6 +112,18 @@ export default function Referrals() {
       </AuthGuard>
     );
   }
+
+  // Normalize referral link for display (server may return relative paths)
+  const displayReferralLink = (() => {
+    try {
+      const rl = referralStats?.referralLink;
+      if (!rl) return "";
+      if (typeof rl === 'string' && rl.startsWith('/')) {
+        return ((typeof window !== 'undefined' && (window as any).__APP_URL__) || window.location.origin) + rl;
+      }
+      return rl;
+    } catch (e) { return referralStats?.referralLink ?? ""; }
+  })();
 
   return (
     <AuthGuard>
@@ -205,7 +228,7 @@ export default function Referrals() {
           <CardContent className="space-y-4">
             <div className="flex space-x-2">
               <Input 
-                value={referralStats.referralLink} 
+                value={displayReferralLink} 
                 readOnly 
                 className="flex-1 glass border-white/10 text-white"
                 data-testid="input-referral-link"
