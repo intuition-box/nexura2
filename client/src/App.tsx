@@ -18,6 +18,7 @@ import Profile from "@/pages/Profile";
 import EditProfile from "@/pages/EditProfile";
 import Achievements from "@/pages/Achievements";
 import Leaderboard from "@/pages/Leaderboard";
+import Levels from "@/pages/Levels";
 import Projects from "@/pages/Projects";
 import ProjectCreate from "@/pages/ProjectCreate";
 import ProjectDashboard from "@/pages/project/ProjectDashboard";
@@ -37,6 +38,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Discover} />
       <Route path="/discover" component={Discover} />
+    <Route path="/levels" component={Levels} />
   {/* NEXURA pages */}
       <Route path="/learn" component={Learn} />
       <Route path="/quests" component={Quests} />

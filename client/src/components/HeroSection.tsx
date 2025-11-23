@@ -23,6 +23,9 @@ export default function HeroSection() {
             <Button size="lg" variant="outline" className="btn-float" data-testid="button-intel-hero">
               Intel
             </Button>
+            <a href="/levels">
+              <Button size="lg" variant="ghost" className="btn-float" data-testid="button-levels-hero">Levels</Button>
+            </a>
           </div>
           
           <div className="max-w-4xl mx-auto mt-6">

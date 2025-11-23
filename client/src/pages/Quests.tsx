@@ -86,208 +86,46 @@ export default function Quests() {
   const [connectedDiscord, setConnectedDiscord] = useState<boolean>(() => {
     try { return localStorage.getItem('nexura:connected:discord') === '1'; } catch(e){ return false; }
   });
+  // Server-provided canonical quests (replace hardcoded arrays)
+  const [quests, setQuests] = useState<any[]>([]);
 
-  // Daily Quest Tasks (structured as single quest with multiple tasks)
-  const dailyQuestTasks = [
-    {
-      id: "daily-task-1",
-      title: "Verify Your Identity",
-      description: "Complete your identity verification process",
-      reward: "50 XP",
-      xp: 50,
-      completed: false,
-      metrics: { tasks: 1 }
-    },
-    {
-      id: "daily-task-2", 
-      title: "Join Community Discussion",
-      description: "Participate in at least one community discussion",
-      reward: "50 XP",
-      xp: 50,
-      completed: false,
-      metrics: { tasks: 1 }
-    },
-    {
-      id: "daily-task-3",
-      title: "Share Intuition Project",
-      description: "Share an Intuition project with the community",
-      reward: "50 XP",
-      xp: 50,
-      completed: false,
-      metrics: { tasks: 1 }
-    },
-    {
-      id: "daily-task-4",
-      title: "Create an Attestation",
-      description: "Make your first attestation on the Intuition platform",
-      reward: "50 XP",
-      xp: 50,
-      completed: false,
-      metrics: { tasks: 1 }
-    }
-  ];
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        try { const token = localStorage.getItem('accessToken'); if (token) headers['Authorization'] = `Bearer ${token}`; } catch(e) {}
+        const res = await fetch(buildUrl('/api/quests'), { headers, credentials: 'include' });
+        if (!res.ok) return;
+        const json = await res.json().catch(() => ({}));
+        const rows = Array.isArray(json?.quests) ? json.quests : [];
+        const normalized = rows.map((r: any) => ({
+          id: r.id,
+          title: r.title,
+          description: r.description,
+          xp: Number(r.xp || r.xp || 0) || 0,
+          reward: r.reward || r.reward_text || '',
+          kind: r.kind,
+          url: r.url,
+          actionLabel: r.action_label || r.actionLabel || '',
+          heroImage: r.hero_image || r.heroImage || '',
+          isActive: r.is_active ?? r.isActive ?? 1,
+        }));
+        if (cancelled) return;
+        setQuests(normalized);
+      } catch (e) {
+        console.warn('[Quests] failed to fetch canonical quests', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
-  const oneTimeQuests = [
-    {
-      id: "onetime-x-follow",
-      title: "Follow on X",
-      description: "Follow our X account to stay updated",
-      reward: "50 XP",
-      kind: 'external',
-      url: 'https://x.com/your_x_account',
-      xp: 50,
-      actionLabel: 'Follow',
-      metrics: { quests: 1 }
-    },
-    {
-      id: "onetime-x-like",
-      title: "Like a Tweet",
-      description: "Like our pinned tweet to show support",
-      reward: "50 XP",
-      kind: 'external',
-      url: 'https://x.com/your_x_account/status/your_tweet_id',
-      targetTweetId: 'your_tweet_id',
-      xp: 50,
-      actionLabel: 'Like',
-      metrics: { quests: 1 }
-    },
-    {
-      id: "onetime-x-retweet",
-      title: "Retweet a Tweet",
-      description: "Retweet our announcement tweet",
-      reward: "50 XP",
-      kind: 'external',
-      url: 'https://x.com/your_x_account/status/your_tweet_id',
-      targetTweetId: 'your_tweet_id',
-      xp: 50,
-      actionLabel: 'Retweet',
-      metrics: { quests: 1 }
-    },
-    {
-      id: "onetime-connect-x",
-      title: "Connect X",
-      description: "Link your X account to verify your identity and join the community",
-      reward: "50 XP",
-      kind: 'connect-x',
-      xp: 50,
-      actionLabel: 'Connect X',
-      metrics: { quests: 1 }
-    },
-    {
-      id: "onetime-connect-discord",
-      title: "Connect Discord",
-      description: "Connect your Discord to access special channels",
-      reward: "50 XP",
-      kind: 'connect-discord',
-      xp: 50,
-      actionLabel: 'Connect Discord',
-      metrics: { quests: 1 }
-    },
-    {
-      id: "onetime-join-discord",
-      title: "Join Discord",
-      description: "Join our Discord server to chat with the community",
-      reward: "50 XP",
-      kind: 'external',
-      url: 'https://discord.gg/your_invite_code',
-      xp: 50,
-      actionLabel: 'Join Discord',
-      metrics: { quests: 1 }
-    }
-  ];
-
-  // Additional user-provided featured quests & campaigns (shown as a compact group)
-  const featuredQuests = [
-    {
-      id: 'std-follow-nexura',
-      title: 'Follow Nexura on X',
-      description: 'Follow Nexura to stay up to date',
-      kind: 'external',
-      url: 'https://x.com/NexuraXYZ',
-      xp: 50,
-      reward: '50 XP',
-      actionLabel: 'Follow Nexura',
-      metrics: { quests: 1 }
-    },
-    {
-      id: 'std-join-discord',
-      title: 'Join Nexura Discord',
-      description: 'Join the Nexura community on Discord and verify yourself',
-      kind: 'external',
-      url: 'https://discord.gg/Up7UjXrdp',
-      xp: 50,
-      reward: '50 XP',
-      actionLabel: 'Join Discord',
-      metrics: { quests: 1 }
-    },
-    {
-      id: 'std-complete-campaign',
-      title: 'Complete a Campaign',
-      description: 'Finish any campaign to qualify for Standard Quests',
-      kind: 'internal',
-      to: '/projects',
-      xp: 50,
-      reward: '50 XP',
-      actionLabel: 'Browse Campaigns',
-      metrics: { quests: 1 }
-    }
-  ];
-
-  const extraQuests = [
-    {
-      id: 'quest-support-claim-1',
-      title: 'Support or Oppose Claim A',
-      description: 'Support or oppose this claim on Intuition',
-      kind: 'external',
-      url: 'https://testnet.portal.intuition.systems/explore/triple/0xb301f076ea5d81e049e5fc1bb47ee6cdf089ce79c86376053e9a2ff7f3058b7d',
-      reward: '50 XP',
-      actionLabel: 'Open Claim',
-      metrics: { quests: 1 }
-    },
-    {
-      id: 'quest-support-claim-2',
-      title: 'Support or Oppose Claim B',
-      description: 'Support or oppose this claim on Intuition',
-      kind: 'external',
-      url: 'https://testnet.portal.intuition.systems/explore/atom/0x15a1eb6044c93eab63862352cbb949c22a537099f8d482e7f05d3e89d80bb1b7',
-      reward: '50 XP',
-      actionLabel: 'Open Claim',
-      metrics: { quests: 1 }
-    }
-  ];
-
-  const campaignTasks = [
-    {
-      id: 'camp-learn-quest',
-      title: 'Complete at least a quest in Learn tab',
-      description: 'Finish any Learn quest to progress campaigns',
-      kind: 'internal',
-      to: '/learn',
-      reward: '50 XP',
-      actionLabel: 'Go to Learn',
-      metrics: { quests: 1 }
-    },
-    {
-      id: 'camp-join-socials',
-      title: 'Join Nexura Socials',
-      description: 'Be part of Nexura socials to unlock campaign rewards',
-      kind: 'external',
-      url: 'https://x.com/NexuraXYZ',
-      reward: '50 XP',
-      actionLabel: 'Open Socials',
-      metrics: { tasks: 1 }
-    },
-    {
-      id: 'camp-support-claim',
-      title: 'Support the Nexura Claim',
-      description: 'Support the nexura claim on Intuition',
-      kind: 'external',
-      url: 'https://testnet.portal.intuition.systems/explore/atom/0x985db42765efe28ba3ed6867fa7bd913955227898f6a665e34e3c9171885f1cc',
-      reward: '50 XP',
-      actionLabel: 'Open Claim',
-      metrics: { quests: 1 }
-    }
-  ];
+  // Group quests by kind for the UI
+  const featuredQuests = quests.filter(q => q.kind === 'featured');
+  const dailyQuestTasks = quests.filter(q => q.kind === 'daily');
+  const oneTimeQuests = quests.filter(q => ['one-time','onetime','one_time','external','connect-x','connect-discord'].includes(q.kind));
+  const campaignTasks = quests.filter(q => ['campaign','campaign-task','campaign_task'].includes(q.kind));
+  const extraQuests = quests.filter(q => !['featured','daily','one-time','onetime','one_time','external','campaign','campaign-task','campaign_task','connect-x','connect-discord'].includes(q.kind));
 
   const handleClaimTask = (taskId: string) => {
     if (!claimedTasks.includes(taskId)) {
@@ -303,6 +141,63 @@ export default function Quests() {
 
   // visitedTasks is an in-memory UI hint only; do not persist to localStorage for important state
   const [visitedTasks, setVisitedTasks] = useState<string[]>([]);
+
+  // Claimable totals come from the server so we don't hardcode client-side assumptions.
+  const [claimableTotals, setClaimableTotals] = useState<{
+    featured?: number;
+    daily?: number;
+    onetime?: number;
+    campaigns?: number;
+    extra?: number;
+  }>({});
+
+  // Helper: request claimable totals for a list of quests from the backend
+  const fetchClaimableFor = async (quests: any[]) => {
+    if (!user || !user.id) return 0;
+    try {
+      const payload = { userId: user.id, quests: quests.map(q => ({ id: q.id, xp: Number(q.xp || (typeof q.reward === 'string' ? (Number((q.reward.match(/(\d+)/) || [0])[0]) || 0) : 0)) })) };
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      try { const token = localStorage.getItem('accessToken'); if (token) headers['Authorization'] = `Bearer ${token}`; } catch(e) {}
+      const resp = await fetch(buildUrl('/api/quests/claimable'), { method: 'POST', headers, credentials: 'include', body: JSON.stringify(payload) });
+      if (!resp.ok) {
+        console.warn('[Quests] claimable API failed', resp.status);
+        return null;
+      }
+      const json = await resp.json().catch(() => ({}));
+      return typeof json?.total === 'number' ? json.total : null;
+    } catch (e) {
+      console.warn('[Quests] failed to fetch claimable totals', e);
+      return null;
+    }
+  };
+
+  // Refresh claimable totals whenever the user or claimedTasks change
+  useEffect(() => {
+    let cancelled = false;
+    if (!user || !user.id) return;
+    (async () => {
+      try {
+        const [featuredTotal, dailyTotal, onetimeTotal, campaignsTotal, extraTotal] = await Promise.all([
+          fetchClaimableFor(featuredQuests),
+          fetchClaimableFor(dailyQuestTasks),
+          fetchClaimableFor(oneTimeQuests),
+          fetchClaimableFor(campaignTasks),
+          fetchClaimableFor(extraQuests),
+        ]);
+        if (cancelled) return;
+        setClaimableTotals({
+          featured: featuredTotal ?? undefined,
+          daily: dailyTotal ?? undefined,
+          onetime: onetimeTotal ?? undefined,
+          campaigns: campaignsTotal ?? undefined,
+          extra: extraTotal ?? undefined,
+        });
+      } catch (e) {
+        console.warn('[Quests] failed to refresh claimable totals', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, claimedTasks.length, quests.length]);
 
   const markVisited = (taskId: string) => {
     if (!visitedTasks.includes(taskId)) {
@@ -600,9 +495,23 @@ export default function Quests() {
         </div>
 
         {/* Featured / User-provided Quests */}
-        <div className="space-y-4">
+          <div className="space-y-4">
           <h2 className="text-xl font-semibold">Featured Quests</h2>
           <p className="text-sm text-muted-foreground mb-2">Quick access to special quests and campaigns.</p>
+
+          {/* Show total claimable XP for featured quests (server-driven when available) */}
+          <div className="text-sm text-muted-foreground mb-2">{
+            (() => {
+              const server = claimableTotals.featured;
+              if (typeof server === 'number') return `Claimable: +${server} XP`;
+              // Fallback to local calculation when server not available
+              const total = featuredQuests.reduce((acc, q) => {
+                const xp = typeof q.xp === 'number' ? q.xp : (typeof q.reward === 'string' ? (Number((q.reward.match(/(\d+)/) || [0])[0]) || 0) : 0);
+                return acc + (claimedTasks.includes(q.id) ? 0 : xp);
+              }, 0);
+              return `Claimable: +${total} XP`;
+            })()
+          }</div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {featuredQuests.map(q => (
@@ -732,6 +641,17 @@ export default function Quests() {
           <TabsContent value="daily" className="space-y-6">
             <div>
               <h2 className="text-xl font-bold text-foreground mb-4">Daily Tasks</h2>
+              <div className="text-sm text-muted-foreground mb-2">{
+                (() => {
+                  const server = claimableTotals.daily;
+                  if (typeof server === 'number') return `Claimable: +${server} XP`;
+                  const total = dailyQuestTasks.reduce((acc, t) => {
+                    const xp = typeof t.xp === 'number' ? t.xp : (typeof t.reward === 'string' ? (Number((t.reward.match(/(\d+)/) || [0])[0]) || 0) : 0);
+                    return acc + (claimedTasks.includes(t.id) ? 0 : xp);
+                  }, 0);
+                  return `Claimable: +${total} XP`;
+                })()
+              }</div>
               <p className="text-sm text-muted-foreground mb-6">
                 Complete these tasks today to earn XP • Resets every 24 hours
               </p>
@@ -788,12 +708,12 @@ export default function Quests() {
                 <div>
                   <h3 className="font-bold text-foreground">Daily Progress</h3>
                   <p className="text-sm text-muted-foreground">
-                    {claimedTasks.length} of {dailyQuestTasks.length} tasks completed
+                    {dailyQuestTasks.filter(q => claimedTasks.includes(q.id)).length} of {dailyQuestTasks.length} tasks completed
                   </p>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-primary">
-                    {Math.round((claimedTasks.length / dailyQuestTasks.length) * 100)}%
+                    {dailyQuestTasks.length === 0 ? 0 : Math.round((dailyQuestTasks.filter(q => claimedTasks.includes(q.id)).length / dailyQuestTasks.length) * 100)}%
                   </div>
                   <div className="text-xs text-muted-foreground">Complete</div>
                 </div>
@@ -806,6 +726,17 @@ export default function Quests() {
           <TabsContent value="onetime" className="space-y-6">
             <div>
               <h2 className="text-xl font-bold text-foreground mb-4">One Time Quests</h2>
+              <div className="text-sm text-muted-foreground mb-2">{
+                (() => {
+                  const server = claimableTotals.onetime;
+                  if (typeof server === 'number') return `Claimable: +${server} XP`;
+                  const total = oneTimeQuests.reduce((acc, q) => {
+                    const xp = typeof q.xp === 'number' ? q.xp : (typeof q.reward === 'string' ? (Number((q.reward.match(/(\d+)/) || [0])[0]) || 0) : 0);
+                    return acc + (claimedTasks.includes(q.id) ? 0 : xp);
+                  }, 0);
+                  return `Claimable: +${total} XP`;
+                })()
+              }</div>
               <p className="text-sm text-muted-foreground mb-6">
                 Complete these essential quests to unlock the full Nexura experience
               </p>
@@ -872,7 +803,7 @@ export default function Quests() {
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-primary">
-                    {Math.round((oneTimeQuests.filter(q => claimedTasks.includes(q.id)).length / oneTimeQuests.length) * 100)}%
+                    {oneTimeQuests.length === 0 ? 0 : Math.round((oneTimeQuests.filter(q => claimedTasks.includes(q.id)).length / oneTimeQuests.length) * 100)}%
                   </div>
                   <div className="text-xs text-muted-foreground">Complete</div>
                 </div>

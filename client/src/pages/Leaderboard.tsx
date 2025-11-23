@@ -128,9 +128,13 @@ export default function Leaderboard() {
                       </div>
                       
                       <Avatar className="w-12 h-12">
-                        <AvatarFallback className="text-lg font-bold bg-gradient-to-br from-purple-500 to-blue-500 text-white">
-                          {entry.level || 1}
-                        </AvatarFallback>
+                        {entry.avatar ? (
+                          <AvatarImage src={entry.avatar} alt={displayName} />
+                        ) : (
+                          <AvatarFallback className="text-lg font-bold bg-gradient-to-br from-purple-500 to-blue-500 text-white">
+                            {entry.level || 1}
+                          </AvatarFallback>
+                        )}
                       </Avatar>
                       
                       <div>

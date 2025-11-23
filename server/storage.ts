@@ -34,6 +34,10 @@ export interface IStorage {
   createReferralClaim(claim: InsertReferralClaim): Promise<ReferralClaim>;
   getReferralClaimsByUser(userId: string): Promise<ReferralClaim[]>;
   getReferralStats(userId: string): Promise<ReferralStats>;
+  // Session token helpers (DB-persisted tokens)
+  createSessionToken(userId: string, address?: string): Promise<string>;
+  getSessionByToken(token: string): Promise<{ userId: string | null; address: string | null; createdAt: string } | undefined>;
+  deleteSessionToken(token: string): Promise<void>;
   // XP & NFT helpers
   getUserProfile(userId: string): Promise<any | undefined>;
   updateUserProfile(userId: string, updates: { displayName?: string; avatar?: string; socialProfiles?: any }): Promise<void>;
@@ -51,6 +55,9 @@ export interface IStorage {
   isQuestCompleted(userId: string, questId: string): Promise<boolean>;
   recordQuestCompletion(userId: string, questId: string, xpAwarded: number): Promise<void>;
   getUserCompletedQuests(userId: string): Promise<string[]>;
+  // Quest catalog (server-side canonical quests)
+  getAllQuests(): Promise<any[]>;
+  getQuestById(id: string): Promise<any | undefined>;
   // Task management
   createTask(task: any): Promise<any>;
   getTaskById(taskId: string): Promise<any | undefined>;
@@ -73,6 +80,7 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
+  private sessionTokens: Map<string, { userId: string; address?: string; createdAt: string }>;
   private users: Map<string, User>;
   private userProfiles: Map<string, any>;
   private levelNfts: Map<string, any>;
@@ -84,6 +92,7 @@ export class MemStorage implements IStorage {
   private taskCompletions: Map<string, Set<string>>; // userId -> Set of taskIds
   private campaignTasks: Map<string, any>; // taskId -> campaign task
   private campaignTaskCompletions: Map<string, Set<string>>; // userId -> Set of campaign taskIds
+  private quests: Map<string, any>;
 
   constructor() {
     this.users = new Map();
@@ -97,9 +106,12 @@ export class MemStorage implements IStorage {
     this.taskCompletions = new Map();
     this.campaignTasks = new Map();
     this.campaignTaskCompletions = new Map();
+    this.sessionTokens = new Map();
+    this.quests = new Map();
     
     // Seed test data
     this.seedTestData();
+    this.seedQuests();
 
     // attempt to load persisted data from disk
     try {
@@ -186,6 +198,38 @@ export class MemStorage implements IStorage {
     } catch (e) {
       console.warn("failed to load persisted storage", e);
     }
+  }
+
+  private seedQuests() {
+    try {
+      // Minimal set of quests for local dev that mirrors the client lists
+      const quests = [
+        { id: 'daily-task-1', title: 'Verify Your Identity', description: 'Complete your identity verification process', xp: 50, reward: '50 XP', kind: 'daily', isActive: 1 },
+        { id: 'daily-task-2', title: 'Join Community Discussion', description: 'Participate in at least one community discussion', xp: 50, reward: '50 XP', kind: 'daily', isActive: 1 },
+        { id: 'onetime-x-follow', title: 'Follow on X', description: 'Follow our X account to stay updated', xp: 50, reward: '50 XP', kind: 'one-time', isActive: 1, actionLabel: 'Follow' },
+        { id: 'onetime-connect-discord', title: 'Connect Discord', description: 'Connect your Discord to access special channels', xp: 50, reward: '50 XP', kind: 'connect-discord', isActive: 1, actionLabel: 'Connect Discord' },
+        { id: 'std-follow-nexura', title: 'Follow Nexura on X', description: 'Follow Nexura to stay up to date', xp: 50, reward: '50 XP', kind: 'featured', isActive: 1 },
+      ];
+      quests.forEach(q => this.quests.set(q.id, q));
+    } catch (e) {
+      console.warn('failed to seed quests', e);
+    }
+  }
+
+  async createSessionToken(userId: string, address?: string) {
+    const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomBytes(8).toString('hex');
+    this.sessionTokens.set(token, { userId, address: address || '', createdAt: new Date().toISOString() });
+    return token;
+  }
+
+  async getSessionByToken(token: string) {
+    const s = this.sessionTokens.get(token);
+    if (!s) return undefined;
+    return { userId: s.userId || null, address: s.address || null, createdAt: s.createdAt };
+  }
+
+  async deleteSessionToken(token: string) {
+    this.sessionTokens.delete(token);
   }
 
   private persistOAuthTokens() {
@@ -537,6 +581,15 @@ export class MemStorage implements IStorage {
     return completedQuests ? Array.from(completedQuests) : [];
   }
 
+  // Quest catalog access for MemStorage
+  async getAllQuests(): Promise<any[]> {
+    return Array.from(this.quests.values());
+  }
+
+  async getQuestById(id: string): Promise<any | undefined> {
+    return this.quests.get(id);
+  }
+
   async getAllCampaigns(): Promise<any[]> {
     // Return empty array for now - campaigns stored per project
     const projects = (this as any).projects || new Map();
@@ -703,6 +756,36 @@ class NeonStorage implements IStorage {
     this.pool = pool;
   }
 
+  // Session token helpers: store tokens in `user_session_tokens`.
+  private async ensureSessionTokensTable() {
+    try {
+      await this.query(`CREATE TABLE IF NOT EXISTS user_session_tokens (token varchar PRIMARY KEY, user_id varchar, address varchar, created_at timestamptz DEFAULT now())`);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  async createSessionToken(userId: string, address?: string) {
+    await this.ensureSessionTokensTable();
+    // generate a random token
+    const token = crypto.randomBytes(32).toString('hex');
+    await this.query(`insert into user_session_tokens (token, user_id, address, created_at) values ($1,$2,$3,now())`, [token, userId, address || null]);
+    return token;
+  }
+
+  async getSessionByToken(token: string) {
+    await this.ensureSessionTokensTable();
+    const r = await this.query(`select user_id, address, created_at from user_session_tokens where token = $1 limit 1`, [token]);
+    if (!r || !r.rows || r.rows.length === 0) return undefined;
+    const row = r.rows[0];
+    return { userId: row.user_id || null, address: row.address || null, createdAt: row.created_at };
+  }
+
+  async deleteSessionToken(token: string) {
+    await this.ensureSessionTokensTable();
+    await this.query(`delete from user_session_tokens where token = $1`, [token]);
+  }
+
   private async query(sql: string, params: any[] = []) {
     return this.pool.query(sql, params);
   }
@@ -826,6 +909,53 @@ class NeonStorage implements IStorage {
     } catch (e) {
       console.warn('getUserCompletedQuests error:', e);
       return [];
+    }
+  }
+
+  // Quests catalog (Neon-backed)
+  private async ensureQuestsTable() {
+    try {
+      await this.query(`
+        CREATE TABLE IF NOT EXISTS quests (
+          id varchar PRIMARY KEY,
+          title varchar NOT NULL,
+          description text,
+          xp integer DEFAULT 0,
+          reward_text varchar,
+          kind varchar,
+          url varchar,
+          action_label varchar,
+          hero_image varchar,
+          is_active integer DEFAULT 1,
+          metadata jsonb DEFAULT '{}'::jsonb,
+          created_at timestamptz DEFAULT now(),
+          updated_at timestamptz DEFAULT now()
+        )
+      `);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  async getAllQuests(): Promise<any[]> {
+    try {
+      await this.ensureQuestsTable();
+      const r = await this.query(`SELECT id, title, description, xp, reward_text as reward, kind, url, action_label, hero_image, is_active FROM quests WHERE is_active = 1 ORDER BY created_at DESC`);
+      return r?.rows || [];
+    } catch (e) {
+      console.warn('[NeonStorage] getAllQuests error', e);
+      return [];
+    }
+  }
+
+  async getQuestById(id: string): Promise<any | undefined> {
+    try {
+      await this.ensureQuestsTable();
+      const r = await this.query(`SELECT * FROM quests WHERE id = $1 LIMIT 1`, [id]);
+      return r?.rows?.[0] || undefined;
+    } catch (e) {
+      console.warn('[NeonStorage] getQuestById error', e);
+      return undefined;
     }
   }
 

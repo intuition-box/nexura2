@@ -31,6 +31,18 @@ export default function Referrals() {
     retry: 1,
   });
 
+  // fetch list of referral events (enriched with referred-user info when available)
+  const { data: referralListData, isLoading: listLoading } = useQuery<any>({
+    queryKey: userId ? ['/api/referrals/list', userId] : ['referrals-list', 'none'],
+    enabled: Boolean(userId),
+    queryFn: async () => {
+      if (!userId) return { events: [] };
+      const res = await apiRequest('GET', `/api/referrals/list/${userId}`);
+      return res.json();
+    },
+    retry: 1,
+  });
+
   // Note: Reward claiming functionality will be added later
 
   const handleCopyLink = () => {
@@ -117,6 +129,43 @@ export default function Referrals() {
               <p className="text-xs text-white/50 mt-1">Friends joined</p>
             </CardContent>
           </Card>
+
+            {/* Referral List */}
+            <Card className="glass glass-hover rounded-3xl" data-testid="referral-list">
+              <CardHeader>
+                <CardTitle className="text-white">Your Referrals</CardTitle>
+                <p className="text-sm text-white/60">People who joined using your referral link</p>
+              </CardHeader>
+              <CardContent>
+                {listLoading ? (
+                  <div className="text-white/60">Loading referred users...</div>
+                ) : (
+                  <div className="space-y-3">
+                    {Array.isArray(referralListData?.events) && referralListData.events.length > 0 ? (
+                      referralListData.events.map((ev: any) => (
+                        <div key={ev.id} className="flex items-center gap-3 p-2 bg-white/2 rounded-lg">
+                          <div className="w-12 h-12 rounded-full overflow-hidden bg-white/5 flex items-center justify-center text-sm font-semibold text-white">
+                            {ev.referredUser?.avatar ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={ev.referredUser.avatar} alt={ev.referredUser.displayName || ev.referredUser.username || 'User'} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="uppercase">{(ev.referredUser?.displayName || ev.referredUser?.username || String(ev.referredUserId || '').slice(0,6) || 'U').charAt(0)}</div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-white">{ev.referredUser?.displayName || ev.referredUser?.username || ev.referredUserId}</div>
+                            <div className="text-xs text-white/60">Joined: {new Date(ev.createdAt || ev.created_at || Date.now()).toLocaleString()}</div>
+                          </div>
+                          <div className="text-sm text-white/50">{ev.referredUser?.xp ? `${ev.referredUser.xp} XP` : ''}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-white/60">No referred users yet. Share your link above to invite friends.</div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
           <Card className="glass glass-hover rounded-3xl" data-testid="active-referrals">
             <CardHeader className="pb-3">

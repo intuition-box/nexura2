@@ -6,6 +6,24 @@ import crypto from "crypto";
 import { verifyMessage } from "ethers";
 import fs from "fs";
 import path from "path";
+// Optional S3-compatible upload support for production (recommended for serverless)
+let s3Client: any = null;
+let S3_BUCKET: string | undefined = undefined;
+let S3_REGION: string | undefined = undefined;
+try {
+  // Lazy require so local dev without AWS SDK doesn't crash
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+  S3_BUCKET = process.env.S3_BUCKET || process.env.AWS_S3_BUCKET || undefined;
+  S3_REGION = process.env.S3_REGION || process.env.AWS_REGION || undefined;
+  if (S3_BUCKET) {
+    s3Client = new S3Client({ region: S3_REGION });
+    // keep PutObjectCommand available via s3Client.__PutObjectCommand for later use
+    (s3Client as any).__PutObjectCommand = PutObjectCommand;
+  }
+} catch (e) {
+  // AWS SDK not installed or not configured; we'll fallback to local filesystem in dev
+}
 
 // In-memory stores for challenges and legacy bearer sessions. For production
 // we prefer server-side sessions (express-session) backed by Postgres.
@@ -69,6 +87,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // List referral events (with optional referred-user enrichment)
+  app.get('/api/referrals/list/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      if (!userId) return res.status(400).json({ error: 'userId required' });
+      const events = await storage.getReferralEventsByReferrer(userId);
+      // Enrich events with referenced user profile if possible
+      const out: any[] = [];
+      for (const ev of events) {
+        const referredId = (ev as any).referredUserId || (ev as any).referred_user_id || null;
+        let referredUser = null;
+        if (referredId) {
+          try {
+            const u = await storage.getUser(referredId);
+            const p = await storage.getUserProfile(referredId);
+            if (u || p) {
+              referredUser = {
+                id: u?.id || referredId,
+                username: u?.username || null,
+                displayName: p?.displayName || u?.displayName || u?.username || null,
+                avatar: p?.avatar || u?.avatar || null,
+                xp: p?.xp || 0,
+                level: p?.level || 1,
+              };
+            }
+          } catch (e) {
+            // ignore enrichment errors
+            referredUser = null;
+          }
+        }
+        out.push({
+          id: ev.id,
+          referrerUserId: ev.referrerUserId || ev.referrer_user_id,
+          referredUserId: referredId,
+          createdAt: ev.createdAt || ev.created_at || null,
+          referredUser,
+        });
+      }
+      return res.json({ events: out });
+    } catch (e) {
+      console.error('[GET /api/referrals/list/:userId] error', e);
+      return res.status(500).json({ error: 'failed to fetch referral list' });
+    }
+  });
+
   // Claim referral rewards (disabled - to be implemented later)
   app.post("/api/referrals/claim/:userId", async (req, res) => {
     try {
@@ -91,6 +154,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(parsed);
     } catch (e) {
       console.error('__dev/user_profiles error', e);
+      return res.status(500).json({ error: 'failed' });
+    }
+  });
+
+  // Dev/Admin: export current in-memory legacy sessions (for migration)
+  app.get('/__admin/export-sessions', async (req, res) => {
+    try {
+      const secret = process.env.DEBUG_SESSION_SECRET || null;
+      const provided = String(req.get('x-debug-secret') || '');
+      if (!secret) return res.status(404).json({ error: 'not available' });
+      if (provided !== secret) return res.status(403).json({ error: 'forbidden' });
+      const arr: any[] = [];
+      for (const [token, obj] of sessions.entries()) {
+        arr.push({ token, address: obj.address || null, createdAt: obj.createdAt || null });
+      }
+      return res.json({ sessions: arr });
+    } catch (e) {
+      console.error('/__admin/export-sessions error', e);
+      return res.status(500).json({ error: 'failed' });
+    }
+  });
+
+  // Dev/Admin: migrate current in-memory legacy sessions into DB-backed `user_session_tokens` table
+  // This preserves the original token strings so existing clients continue to work.
+  app.post('/__admin/migrate-sessions', async (req, res) => {
+    try {
+      const secret = process.env.DEBUG_SESSION_SECRET || null;
+      const provided = String(req.get('x-debug-secret') || '');
+      if (!secret) return res.status(404).json({ error: 'not available' });
+      if (provided !== secret) return res.status(403).json({ error: 'forbidden' });
+
+      const migrated: string[] = [];
+      const skipped: string[] = [];
+
+      // If storage exposes a query method (NeonStorage), use it to insert preserving token values.
+      const poolish = (storage as any).query ? (storage as any) : null;
+
+      for (const [token, obj] of sessions.entries()) {
+        const address = obj.address ? String(obj.address).toLowerCase() : null;
+        const createdAt = obj.createdAt ? new Date(obj.createdAt) : new Date();
+
+        // try to resolve userId by address
+        let userId: string | null = null;
+        try {
+          const user = address ? await storage.getUserByAddress(address) : null;
+          if (user) userId = user.id || null;
+        } catch (e) {
+          // ignore
+        }
+
+        try {
+          if (poolish && typeof poolish.query === 'function') {
+            await poolish.query(`INSERT INTO user_session_tokens (token, user_id, address, created_at) VALUES ($1,$2,$3,$4) ON CONFLICT (token) DO NOTHING`, [token, userId, address, createdAt]);
+          } else {
+            // MemStorage: directly set its sessionTokens map to preserve the token value
+            try {
+              const mem = storage as any;
+              if (mem && mem.sessionTokens && typeof mem.sessionTokens.set === 'function') {
+                mem.sessionTokens.set(token, { userId: userId || '', address: address || '', createdAt: createdAt.toISOString() });
+              } else if (mem && typeof mem.createSessionToken === 'function') {
+                // fallback: create a new token entry (will generate a new token) - not ideal
+                await mem.createSessionToken(userId || '', address || null);
+              }
+            } catch (e) {
+              // ignore
+            }
+          }
+          migrated.push(token);
+        } catch (e) {
+          console.warn('failed to migrate token', token, e && e.message ? e.message : e);
+          skipped.push(token);
+        }
+      }
+
+      return res.json({ migratedCount: migrated.length, migrated, skippedCount: skipped.length, skipped });
+    } catch (e) {
+      console.error('/__admin/migrate-sessions error', e);
       return res.status(500).json({ error: 'failed' });
     }
   });
@@ -214,7 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // helper to require an authenticated session token
   // Only accepts Authorization: Bearer <token>.
-  function getSessionFromReq(req: any) {
+  async function getSessionFromReq(req: any) {
     try {
       console.log(`🔍 Auth check for ${req.method} ${req.path}`);
 
@@ -237,24 +377,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn('session check failed', e);
       }
 
-      // Fallback: legacy Bearer token support
-      const auth = String(req.headers.authorization || "").trim();
-      if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
-        console.log('❌ No Bearer authorization header present');
+      // Fallback: Bearer token support — use DB-backed session tokens only.
+      // In production we require Neon/Postgres-backed tokens. For development
+      // we may fall back to the in-memory `sessions` map if Neon isn't available.
+      try {
+        const auth = String(req.headers.authorization || "").trim();
+        if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
+          console.log('❌ No Bearer authorization header present');
+          return null;
+        }
+        const token = auth.split(/\s+/)[1];
+        if (!token) {
+          console.log('❌ Malformed Bearer token');
+          return null;
+        }
+
+        // Prefer storage-backed tokens (NeonStorage). This ensures production
+        // authentication always consults the database rather than transient
+        // in-memory state.
+        if (storage && typeof (storage as any).getSessionByToken === 'function') {
+          try {
+            const dbSess = await (storage as any).getSessionByToken(token);
+            if (dbSess) {
+              const sessionObj: any = { createdAt: dbSess.createdAt || Date.now() };
+              if (dbSess.userId) sessionObj.userId = dbSess.userId;
+              if (dbSess.address) sessionObj.address = String(dbSess.address).toLowerCase();
+              console.log(`✅ Auth via DB-backed token for ${String(sessionObj.address || sessionObj.userId).substring(0,10)}...`);
+              return { token, session: sessionObj };
+            }
+            console.log('❌ Bearer token not found in DB');
+          } catch (e) {
+            console.warn('error checking DB session token', e && e.message ? e.message : e);
+          }
+        }
+
+        // Development fallback: in-memory sessions map
+        if ((process.env.NODE_ENV || 'development') !== 'production') {
+          const s = sessions.get(token);
+          if (s) {
+            console.log(`✅ Auth via in-memory dev token for ${s.address.substring(0, 10)}...`);
+            return { token, session: s };
+          }
+        }
+
+        return null;
+      } catch (e) {
+        console.log('❌ Auth error:', e);
         return null;
       }
-      const token = auth.split(/\s+/)[1];
-      if (!token) {
-        console.log('❌ Malformed Bearer token');
-        return null;
-      }
-      const s = sessions.get(token);
-      if (!s) {
-        console.log('❌ Bearer token not found in sessions');
-        return null;
-      }
-      console.log(`✅ Auth via Bearer token for ${s.address.substring(0, 10)}...`);
-      return { token, session: s };
     } catch (e) {
       console.log('❌ Auth error:', e);
       return null;
@@ -264,7 +434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Step 1: obtain request token and redirect user to X authorize
   app.get('/auth/x/login', async (req, res) => {
     try {
-      const sess = getSessionFromReq(req);
+      const sess = await getSessionFromReq(req);
       if (!sess || !sess.session) return res.status(401).send('sign in required');
 
       const TWITTER_KEY = process.env.TWITTER_API_KEY;
@@ -377,7 +547,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Verification endpoints for quests (follow/like/retweet)
   app.post('/quests/verify/follow', async (req, res) => {
     try {
-      const sess = getSessionFromReq(req);
+      const sess = await getSessionFromReq(req);
       if (!sess || !sess.session) return res.status(401).json({ error: 'not authenticated' });
       let user = null;
       if (sess.session.userId) {
@@ -418,7 +588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Stub endpoints for like and retweet verification (can be expanded)
   app.post('/quests/verify/like', async (req, res) => {
     try {
-      const sess = getSessionFromReq(req);
+      const sess = await getSessionFromReq(req);
       if (!sess || !sess.session) return res.status(401).json({ error: 'not authenticated' });
       let user = null;
       if (sess.session.userId) {
@@ -454,7 +624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/quests/verify/retweet', async (req, res) => {
     try {
-      const sess = getSessionFromReq(req);
+      const sess = await getSessionFromReq(req);
       if (!sess || !sess.session) return res.status(401).json({ error: 'not authenticated' });
       let user = null;
       if (sess.session.userId) {
@@ -492,7 +662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Logout: clear server-side session and instruct client to remove cookie
   app.post("/auth/logout", async (req, res) => {
     try {
-      const sess = getSessionFromReq(req);
+      const sess = await getSessionFromReq(req);
       // Destroy server-side cookie session if present
       try {
         if ((req as any).session) {
@@ -517,7 +687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Return profile for authenticated session (bearer-based)
   app.get("/profile", async (req, res) => {
     try {
-      const sess = getSessionFromReq(req);
+      const sess = await getSessionFromReq(req);
       if (!sess) return res.status(401).json({ error: "not authenticated" });
 
       // Try to fetch user from DB using userId stored on session when available,
@@ -559,7 +729,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Return combined user + profile info for the authenticated session
   app.get("/api/me", async (req, res) => {
     try {
-      const sess = getSessionFromReq(req);
+      const sess = await getSessionFromReq(req);
       if (!sess) return res.status(401).json({ error: "not authenticated" });
 
       let user = null;
@@ -614,7 +784,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update user profile (display name, avatar, etc.)
   app.post("/api/upload/avatar", async (req, res) => {
     try {
-      const sess = getSessionFromReq(req);
+      const sess = await getSessionFromReq(req);
       // Log auth info for debugging upload failures (server session preferred)
       try {
         console.log('/api/upload/avatar headers:', { authorization: req.headers.authorization });
@@ -647,19 +817,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ext = fileName?.split('.').pop() || 'png';
       const uniqueName = `avatar-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
       
-      // Create uploads directory if it doesn't exist
-      const uploadsDir = path.join(process.cwd(), 'uploads', 'avatars');
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
+      // Prefer S3-compatible object storage in production/serverless
+      let publicUrl = null;
+      const buffer = Buffer.from(base64Data, 'base64');
+      const key = `avatars/${uniqueName}`;
+
+      if (s3Client && S3_BUCKET) {
+        try {
+          const PutObjectCommand = (s3Client as any).__PutObjectCommand;
+          await s3Client.send(new PutObjectCommand({
+            Bucket: S3_BUCKET,
+            Key: key,
+            Body: buffer,
+            ContentType: `image/${ext}`,
+            // Do not set ACL in most production setups; leave permissions to bucket policy
+          }));
+
+          // Determine public URL: prefer explicit S3_PUBLIC_URL env var, otherwise use standard S3 URL format
+          if (process.env.S3_PUBLIC_URL) {
+            publicUrl = `${process.env.S3_PUBLIC_URL.replace(/\/$/, '')}/${key}`;
+          } else if (S3_REGION) {
+            publicUrl = `https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws.com/${key}`;
+          } else {
+            publicUrl = `https://${S3_BUCKET}.s3.amazonaws.com/${key}`;
+          }
+        } catch (s3Err) {
+          console.error('S3 upload failed', s3Err);
+          return res.status(500).json({ error: 'failed to upload to object storage', detail: String(s3Err && s3Err.message ? s3Err.message : s3Err) });
+        }
+      } else {
+        // Local filesystem fallback (for development only). In production/serverless this should not be used.
+        if (process.env.NODE_ENV === 'production') {
+          return res.status(500).json({ error: 'server not configured for file uploads (missing S3_BUCKET)' });
+        }
+
+        // Create uploads directory if it doesn't exist
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'avatars');
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        
+        // Save file locally
+        const filePath = path.join(uploadsDir, uniqueName);
+        fs.writeFileSync(filePath, buffer);
+        publicUrl = `/uploads/avatars/${uniqueName}`;
       }
-      
-      // Save file
-      const filePath = path.join(uploadsDir, uniqueName);
-      fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
-      
-      // Return public URL
-      const publicUrl = `/uploads/avatars/${uniqueName}`;
-      
+
       return res.json({ success: true, url: publicUrl });
     } catch (e) {
       console.error("/api/upload/avatar error", e);
@@ -669,7 +872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/users/profile", async (req, res) => {
     try {
-      const sess = getSessionFromReq(req);
+      const sess = await getSessionFromReq(req);
       if (!sess) return res.status(401).json({ error: "not authenticated" });
 
       let user = null;
@@ -963,6 +1166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             u.username,
             u.address,
             p.display_name,
+            p.avatar,
             COALESCE(p.xp, 0) as xp,
             COALESCE(p.level, 1) as level,
             COALESCE(p.quests_completed, 0) as quests_completed,
@@ -1051,7 +1255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Campaign Tasks API
   app.post("/api/campaigns/:campaignId/tasks", async (req, res) => {
     try {
-      const sess = getSessionFromReq(req);
+      const sess = await getSessionFromReq(req);
       if (!sess?.session) return res.status(401).json({ error: "not authenticated" });
       
       const { campaignId } = req.params;
@@ -1098,6 +1302,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
+    // Quests API: list canonical quests (server-side catalog)
+    app.get('/api/quests', async (req, res) => {
+      try {
+        const q = await storage.getAllQuests();
+        return res.json({ quests: q });
+      } catch (e) {
+        console.error('[GET /api/quests] error', e);
+        return res.status(500).json({ error: 'failed to fetch quests' });
+      }
+    });
+
+    app.get('/api/quests/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        if (!id) return res.status(400).json({ error: 'quest id required' });
+        const q = await storage.getQuestById(id);
+        if (!q) return res.status(404).json({ error: 'quest not found' });
+        return res.json({ quest: q });
+      } catch (e) {
+        console.error('[GET /api/quests/:id] error', e);
+        return res.status(500).json({ error: 'failed to fetch quest' });
+      }
+    });
+
+    // Quests API: compute claimable XP for a set of quest ids supplied by the client
+    // Expects body { userId: string, quests: Array<{ id: string, xp: number }> }
+    app.post('/api/quests/claimable', async (req, res) => {
+      try {
+        const { userId, quests } = req.body || {};
+        if (!userId) return res.status(400).json({ error: 'userId required' });
+        if (!Array.isArray(quests)) return res.status(400).json({ error: 'quests array required' });
+
+        let total = 0;
+        const perId: Record<string, number> = {};
+
+        for (const q of quests) {
+          if (!q || !q.id) continue;
+          const xp = Number(q.xp || 0) || 0;
+          try {
+            const done = await storage.isQuestCompleted(userId, q.id);
+            if (!done) {
+              total += xp;
+              perId[q.id] = xp;
+            } else {
+              perId[q.id] = 0;
+            }
+          } catch (e) {
+            // If storage check fails, assume not completed to avoid hiding rewards
+            perId[q.id] = xp;
+            total += xp;
+          }
+        }
+
+        return res.json({ total, perId });
+      } catch (e) {
+        console.error('[POST /api/quests/claimable] error', e);
+        return res.status(500).json({ error: 'failed to compute claimable xp' });
+      }
+    });
+
     // Quests API: claim a quest (wrapper over /api/xp/add) - ensures idempotency and returns updated profile
     app.post('/api/quests/claim', async (req, res) => {
       try {
@@ -1129,7 +1393,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/campaigns/:campaignId/tasks/:taskId", async (req, res) => {
     try {
-      const sess = getSessionFromReq(req);
+      const sess = await getSessionFromReq(req);
       if (!sess?.session) return res.status(401).json({ error: "not authenticated" });
       
       const { campaignId, taskId } = req.params;
@@ -1150,7 +1414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/campaigns/:campaignId/tasks/:taskId", async (req, res) => {
     try {
-      const sess = getSessionFromReq(req);
+      const sess = await getSessionFromReq(req);
       if (!sess?.session) return res.status(401).json({ error: "not authenticated" });
       
       const { campaignId, taskId } = req.params;

@@ -14,9 +14,7 @@
     <div id="root"></div>
     <!-- Runtime backend URL injection: replace the placeholder with your API URL or have your server inject it -->
     <script>
-      // Runtime BACKEND_URL: prefer an already-injected value. If not present,
-      // prefer the current origin when served over HTTPS (production), otherwise
-      // fall back to the developer LAN API for local testing.
+  
       (function(){
         try {
           if (window.__BACKEND_URL__) return;

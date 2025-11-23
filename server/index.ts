@@ -1,4 +1,8 @@
 import dotenv from "dotenv";
+// Provide a CommonJS `require` shim for modules that use `require()` in ESM
+import { createRequire } from 'module';
+// expose a require function on globalThis so legacy modules using `require()` still work
+(globalThis as any).require = createRequire(import.meta.url);
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 
@@ -56,11 +60,22 @@ app.use(express.urlencoded({ extended: false }));
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        sameSite: "lax",
+        // In production serverless deployments where frontend may be on a different origin,
+        // we need SameSite='none' and secure cookies. In development default to 'lax'.
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 1000 * 60 * 60 * 24 * 7,
       },
     }) as any,
   );
+
+  // If running behind a proxy or CDN (typical in serverless), trust the first proxy
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      app.set('trust proxy', 1);
+    } catch (e) {
+      // ignore
+    }
+  }
 
 // CORS: do not use cookies or credentialed requests. The API uses Authorization: Bearer <token>
 // Allow cross-origin requests but do NOT advertise support for credentials/cookies.
