@@ -69,6 +69,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
       const stats = await storage.getReferralStats(userId);
+      // Ensure referralLink is an absolute URL. Storage implementations may return
+      // a path-only link or a hardcoded domain; prefer APP_URL if configured,
+      // otherwise derive from the incoming request's host.
+      try {
+        const link = String((stats && stats.referralLink) || '').trim();
+        if (link && !/^https?:\/\//i.test(link)) {
+          const appUrl = (process.env.APP_URL || process.env.VITE_BACKEND_URL || '').replace(/\/+$/g, '');
+          const prefix = appUrl || `${req.protocol}://${String(req.get('host') || '')}`;
+          stats.referralLink = `${prefix.replace(/\/+$/g, '')}/${link.replace(/^\/+/, '')}`;
+        }
+      } catch (e) {
+        // ignore and return stats as-is
+      }
       res.json(stats);
     } catch (error) {
       console.error("Error fetching referral stats:", error);

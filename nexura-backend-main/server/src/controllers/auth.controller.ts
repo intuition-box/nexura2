@@ -41,6 +41,22 @@ export const signUp = async (req: GlobalRequest, res: GlobalResponse) => {
 			await userReferrer.updateOne({ $inc: { xp: 10, "referral.xp": 10 } });
 			newUser.xp = 10;
 			await newUser.save();
+
+			// Attempt to record a referral event in the central referral service
+			try {
+				const central = (process.env.APP_URL || process.env.REFERRAL_API_URL || '').replace(/\/+$/g, '');
+				const endpoint = central ? `${central}/api/referrals/event` : `/api/referrals/event`;
+				// Prefer making an internal POST using fetch if available
+				if (typeof fetch === 'function') {
+					await fetch(endpoint, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ referrerUserId: String(userReferrer._id), referredUserId: String(newUser._id) })
+					});
+				}
+			} catch (err) {
+				logger.warn('failed to create central referral event', err);
+			}
 		}
 
 		const id = newUser._id;

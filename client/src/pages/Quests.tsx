@@ -134,6 +134,23 @@ export default function Quests() {
     }
   };
 
+  // Helper: determine XP amount for a quest/task
+  const getXpAmount = (q: any) => {
+    if (!q) return 0;
+    if (typeof q.xp === 'number' && !Number.isNaN(q.xp)) return Number(q.xp);
+    if (typeof q.reward === 'string') {
+      const m = q.reward.match(/(\d+)/);
+      if (m) return Number(m[1]) || 0;
+    }
+    return 0;
+  };
+
+  const claimLabelFor = (id: string, q: any) => {
+    if (claimedTasks.includes(id)) return 'Claimed';
+    const xp = getXpAmount(q);
+    return xp > 0 ? `Claim ${xp} XP` : 'Claim XP';
+  };
+
   const unclaimTask = (taskId: string) => {
     const next = claimedTasks.filter(id => id !== taskId);
     setClaimedTasks(next);
@@ -349,24 +366,24 @@ export default function Quests() {
         // map to server endpoints
         const endpoint = action.includes('follow') ? '/quests/verify/follow' : action.includes('like') ? '/quests/verify/like' : action.includes('retweet') ? '/quests/verify/retweet' : null;
         if (endpoint) {
-          // send target info if available — use apiRequest so Authorization header is applied
-          const target = quest.target || 'your_x_account';
-          try {
-            apiRequest('POST', endpoint, { target })
-              .then(r => r.json().catch(() => null))
-              .then(json => {
-                if (json && json.ok) handleClaimTask(quest.id);
-              }).catch(() => {});
-          } catch (e) {
-            // ignore - claim will remain local-only
-            console.warn('[Quests] verify request failed', e);
+            // send target info if available — use apiRequest so Authorization header is applied
+            const target = quest.target || 'your_x_account';
+            try {
+              apiRequest('POST', endpoint, { target })
+                .then(r => r.json().catch(() => null))
+                .then(json => {
+                  // Do NOT auto-claim on verify success. Mark visited so the Claim button is enabled
+                  if (json && json.ok) markVisited(quest.id);
+                }).catch(() => {});
+            } catch (e) {
+              // ignore - the user can manually press Claim after returning
+              console.warn('[Quests] verify request failed', e);
+            }
+            return;
           }
-          return;
         }
-      }
-      // default immediate claim for generic external links
-      handleClaimTask(quest.id);
-      return;
+        // Do not auto-claim generic external links; only mark visited so user must press Claim
+        return;
     }
     if (quest.kind === 'connect-x') {
       // Start OAuth1 flow by redirecting to server endpoint which begins request_token flow
@@ -377,11 +394,12 @@ export default function Quests() {
     if (quest.kind === 'connect-discord') {
       setConnectedDiscord(true);
       try { localStorage.setItem('nexura:connected:discord', '1'); } catch(e){}
-      handleClaimTask(quest.id);
+      // Do not auto-claim; enable claim button after connect
+      try { markVisited(quest.id); } catch(e){}
       return;
     }
-    // default fallback: just claim
-    handleClaimTask(quest.id);
+    // default fallback: just mark visited (do not auto-claim). User must press the Claim button.
+    try { markVisited(quest.id); } catch(e){}
   };
 
   const renderQuestCard = (quest: any, showProgress = false) => (
@@ -546,7 +564,7 @@ export default function Quests() {
                       disabled={!visitedTasks.includes(q.id) || claimedTasks.includes(q.id)}
                       onClick={() => claimAndAwardXp(q)}
                     >
-                      {claimedTasks.includes(q.id) ? 'Claimed' : 'Claim XP'}
+                      {claimLabelFor(q.id, q)}
                     </Button>
                   </div>
                 </div>
@@ -579,7 +597,7 @@ export default function Quests() {
                       disabled={!visitedTasks.includes(q.id) || claimedTasks.includes(q.id)}
                       onClick={() => claimAndAwardXp(q)}
                     >
-                      {claimedTasks.includes(q.id) ? 'Claimed' : 'Claim XP'}
+                      {claimLabelFor(q.id, q)}
                     </Button>
                   </div>
                 </div>
@@ -615,7 +633,7 @@ export default function Quests() {
                       disabled={!visitedTasks.includes(q.id) || claimedTasks.includes(q.id)}
                       onClick={() => claimAndAwardXp(q)}
                     >
-                      {claimedTasks.includes(q.id) ? 'Claimed' : 'Claim XP'}
+                      {claimLabelFor(q.id, q)}
                     </Button>
                   </div>
                 </div>
@@ -693,7 +711,7 @@ export default function Quests() {
                           onClick={() => claimAndAwardXp(task)}
                           data-testid={`claim-task-${task.id}`}
                         >
-                          {claimedTasks.includes(task.id) ? 'Claimed' : 'Claim XP'}
+                          {claimLabelFor(task.id, task)}
                         </Button>
                       </div>
                     </div>
@@ -783,7 +801,7 @@ export default function Quests() {
                           onClick={() => !claimedTasks.includes(quest.id) && claimAndAwardXp(quest)}
                           data-testid={`claim-quest-${quest.id}`}
                         >
-                          {claimedTasks.includes(quest.id) ? 'Claimed' : 'Claim XP'}
+                          {claimLabelFor(quest.id, quest)}
                         </Button>
                       </div>
                     </div>
