@@ -896,24 +896,29 @@ class NeonStorage implements IStorage {
       if (process.env.PER_USER_QUEST_TABLES === 'true') {
         const tbl = this.getUserQuestTableName(userId);
         await this.ensureUserQuestTable(userId);
-        try {
-          await this.query(`INSERT INTO ${tbl} (quest_id, xp_awarded) VALUES ($1, $2) ON CONFLICT (quest_id) DO NOTHING`, [questId, xpAwarded]);
-        } catch (e: any) {
-          if (e?.code === '23505' || (e?.message || '').toLowerCase().includes('duplicate')) {
-            const err = new Error(`Quest ${questId} already completed by user ${userId}`);
-            (err as any).code = 'DUPLICATE_QUEST_COMPLETION';
-            throw err;
-          }
-          throw e;
+        // Use RETURNING to detect whether the insert actually created a row. If
+        // another concurrent request already created the row, ON CONFLICT DO
+        // NOTHING will yield no returning rows — treat that as a duplicate.
+        const r = await this.query(`INSERT INTO ${tbl} (quest_id, xp_awarded) VALUES ($1, $2) ON CONFLICT (quest_id) DO NOTHING RETURNING quest_id`, [questId, xpAwarded]);
+        if (!r || !r.rows || r.rows.length === 0) {
+          const err = new Error(`Quest ${questId} already completed by user ${userId}`);
+          (err as any).code = 'DUPLICATE_QUEST_COMPLETION';
+          throw err;
         }
         return;
       }
 
-      await this.query(
+      // For shared table, also ensure we detect duplicates via RETURNING
+      const res = await this.query(
         `INSERT INTO user_quest_completions (user_id, quest_id, xp_awarded) VALUES ($1, $2, $3)
-         ON CONFLICT (user_id, quest_id) DO NOTHING`,
+         ON CONFLICT (user_id, quest_id) DO NOTHING RETURNING id`,
         [userId, questId, xpAwarded]
       );
+      if (!res || !res.rows || res.rows.length === 0) {
+        const err = new Error(`Quest ${questId} already completed by user ${userId}`);
+        (err as any).code = 'DUPLICATE_QUEST_COMPLETION';
+        throw err;
+      }
     } catch (e) {
       console.warn('recordQuestCompletion error:', e);
       throw e;
