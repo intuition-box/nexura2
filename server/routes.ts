@@ -672,6 +672,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Levels minting endpoint: mint NFTs for milestone levels (server-side wallet required)
+  app.post('/api/levels/mint', async (req, res) => {
+    try {
+      const { level } = req.body || {};
+      if (!level || typeof Number(level) !== 'number') return res.status(400).json({ error: 'level required' });
+      const lvl = Number(level);
+      if (lvl <= 0 || lvl > 100 || lvl % 5 !== 0) return res.status(400).json({ error: 'level must be a multiple of 5 between 5 and 100' });
+
+      const sess = await getSessionFromReq(req);
+      if (!sess || !sess.session) return res.status(401).json({ error: 'not authenticated' });
+
+      // Determine recipient address: prefer session.address then storage lookup
+      let recipientAddr: string | null = null;
+      try {
+        if (sess.session.address) recipientAddr = String(sess.session.address).toLowerCase();
+        else if (sess.session.userId) {
+          const u = await storage.getUser(sess.session.userId as string);
+          if (u && (u as any).address) recipientAddr = String((u as any).address).toLowerCase();
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      if (!recipientAddr) return res.status(400).json({ error: 'no recipient wallet address available for this user' });
+
+      // Build token URI (simple hosted metadata path on APP_URL)
+      const appUrl = (process.env.APP_URL || '').replace(/\/+$/g, '') || `${req.protocol}://${String(req.get('host') || '')}`;
+      const tokenUri = `${appUrl}/levels/metadata/level-${lvl}.json`;
+
+      // Check server wallet configuration
+      const CONTRACT = process.env.LEVEL_BADGE_ADDRESS || process.env.LEVEL_CONTRACT_ADDRESS || null;
+      const RPC = process.env.LEVEL_RPC_URL || process.env.INTUITION_TESTNET_RPC || null;
+      const PK = process.env.LEVEL_SERVER_PRIVATE_KEY || process.env.SERVER_PRIVATE_KEY || null;
+
+      // If config missing, queue the job to disk (simple queue) and return queued response
+      if (!CONTRACT || !RPC || !PK) {
+        // Simple on-disk job queue
+        try {
+          const jobsPath = path.resolve(process.cwd(), 'server', 'data', 'mint_jobs.json');
+          let jobs: any[] = [];
+          if (fs.existsSync(jobsPath)) {
+            try { jobs = JSON.parse(fs.readFileSync(jobsPath, 'utf8') || '[]'); } catch(e) { jobs = []; }
+          }
+          const job = { id: crypto.randomBytes(8).toString('hex'), userId: sess.session.userId || null, recipient: recipientAddr, level: lvl, tokenUri, createdAt: new Date().toISOString(), status: 'queued' };
+          jobs.push(job);
+          fs.mkdirSync(path.dirname(jobsPath), { recursive: true });
+          fs.writeFileSync(jobsPath, JSON.stringify(jobs, null, 2), 'utf8');
+          return res.json({ queued: true, job });
+        } catch (e) {
+          console.warn('failed to enqueue mint job', e);
+          return res.status(500).json({ error: 'failed to queue mint job' });
+        }
+      }
+
+      // Attempt to mint immediately using ethers
+      try {
+        // lazy require to avoid adding dependency at top-level
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const ethers = require('ethers');
+        const provider = new ethers.providers.JsonRpcProvider(RPC);
+        const wallet = new ethers.Wallet(PK, provider);
+
+        // Try to load ABI from local artifact (nexura-backend-main smart-contract artifacts)
+        let abi = null;
+        try {
+          const artifactPath = path.resolve(process.cwd(), '..', 'nexura-backend-main', 'smart-contract', 'artifacts', 'contracts', 'LevelBadge.sol', 'LevelBadge.json');
+          if (fs.existsSync(artifactPath)) {
+            const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+            abi = artifact.abi;
+          }
+        } catch (e) {
+          // ignore
+        }
+        if (!abi) {
+          // minimal ABI for mintTo(address,string)
+          abi = [{ "inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"string","name":"uri","type":"string"}],"name":"mintTo","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function" }];
+        }
+
+        const contract = new ethers.Contract(CONTRACT, abi, wallet);
+        const tx = await contract.mintTo(recipientAddr, tokenUri, { gasLimit: 800000 });
+        const receipt = await tx.wait();
+        // Optionally persist a record of the mint
+        try {
+          const jobsPath = path.resolve(process.cwd(), 'server', 'data', 'mint_jobs.json');
+          let jobs: any[] = [];
+          if (fs.existsSync(jobsPath)) { try { jobs = JSON.parse(fs.readFileSync(jobsPath, 'utf8') || '[]'); } catch(e) { jobs = []; } }
+          const job = { id: crypto.randomBytes(8).toString('hex'), userId: sess.session.userId || null, recipient: recipientAddr, level: lvl, tokenUri, createdAt: new Date().toISOString(), status: 'minted', txHash: tx.hash, receipt };
+          jobs.push(job);
+          fs.mkdirSync(path.dirname(jobsPath), { recursive: true });
+          fs.writeFileSync(jobsPath, JSON.stringify(jobs, null, 2), 'utf8');
+        } catch (e) {
+          console.warn('failed to persist mint job', e);
+        }
+
+        return res.json({ ok: true, txHash: tx.hash, receipt });
+      } catch (e) {
+        console.error('levels mint error', e);
+        return res.status(500).json({ error: 'mint failed', details: String(e) });
+      }
+    } catch (e) {
+      console.error('/api/levels/mint error', e);
+      return res.status(500).json({ error: 'failed' });
+    }
+  });
+
   // Logout: clear server-side session and instruct client to remove cookie
   app.post("/auth/logout", async (req, res) => {
     try {

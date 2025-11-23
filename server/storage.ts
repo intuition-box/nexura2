@@ -875,6 +875,11 @@ class NeonStorage implements IStorage {
 
   async isQuestCompleted(userId: string, questId: string): Promise<boolean> {
     try {
+      if (process.env.PER_USER_QUEST_TABLES === 'true') {
+        const tbl = this.getUserQuestTableName(userId);
+        const r = await this.query(`SELECT quest_id FROM ${tbl} WHERE quest_id = $1 LIMIT 1`, [questId]);
+        return r.rows && r.rows.length > 0;
+      }
       const r = await this.query(
         `SELECT id FROM user_quest_completions WHERE user_id = $1 AND quest_id = $2 LIMIT 1`,
         [userId, questId]
@@ -888,6 +893,22 @@ class NeonStorage implements IStorage {
 
   async recordQuestCompletion(userId: string, questId: string, xpAwarded: number): Promise<void> {
     try {
+      if (process.env.PER_USER_QUEST_TABLES === 'true') {
+        const tbl = this.getUserQuestTableName(userId);
+        await this.ensureUserQuestTable(userId);
+        try {
+          await this.query(`INSERT INTO ${tbl} (quest_id, xp_awarded) VALUES ($1, $2) ON CONFLICT (quest_id) DO NOTHING`, [questId, xpAwarded]);
+        } catch (e: any) {
+          if (e?.code === '23505' || (e?.message || '').toLowerCase().includes('duplicate')) {
+            const err = new Error(`Quest ${questId} already completed by user ${userId}`);
+            (err as any).code = 'DUPLICATE_QUEST_COMPLETION';
+            throw err;
+          }
+          throw e;
+        }
+        return;
+      }
+
       await this.query(
         `INSERT INTO user_quest_completions (user_id, quest_id, xp_awarded) VALUES ($1, $2, $3)
          ON CONFLICT (user_id, quest_id) DO NOTHING`,
@@ -901,6 +922,12 @@ class NeonStorage implements IStorage {
 
   async getUserCompletedQuests(userId: string): Promise<string[]> {
     try {
+      if (process.env.PER_USER_QUEST_TABLES === 'true') {
+        const tbl = this.getUserQuestTableName(userId);
+        await this.ensureUserQuestTable(userId);
+        const r = await this.query(`SELECT quest_id FROM ${tbl} ORDER BY completed_at DESC`);
+        return r.rows ? r.rows.map((row: any) => row.quest_id) : [];
+      }
       const r = await this.query(
         `SELECT quest_id FROM user_quest_completions WHERE user_id = $1 ORDER BY completed_at DESC`,
         [userId]
@@ -909,6 +936,35 @@ class NeonStorage implements IStorage {
     } catch (e) {
       console.warn('getUserCompletedQuests error:', e);
       return [];
+    }
+  }
+
+  // Helper: sanitized per-user quest table name (based on sha256 of userId)
+  private getUserQuestTableName(userId: string) {
+    const hash = require('crypto').createHash('sha256').update(String(userId)).digest('hex').slice(0, 12);
+    return `user_quest_completions_u_${hash}`;
+  }
+
+  // Ensure a per-user quest table exists with appropriate constraints
+  private async ensureUserQuestTable(userId: string) {
+    const tbl = this.getUserQuestTableName(userId);
+    const createSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      quest_id varchar NOT NULL UNIQUE,
+      xp_awarded integer DEFAULT 0,
+      completed_at timestamptz DEFAULT now()
+    )`;
+    try {
+      await this.query(createSql);
+    } catch (e) {
+      // Some Postgres environments may not have gen_random_uuid(); fallback to uuid_generate_v4 if available
+      const altSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+        id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        quest_id varchar NOT NULL UNIQUE,
+        xp_awarded integer DEFAULT 0,
+        completed_at timestamptz DEFAULT now()
+      )`;
+      try { await this.query(altSql); } catch (err) { /* ignore */ }
     }
   }
 
@@ -960,15 +1016,46 @@ class NeonStorage implements IStorage {
   }
 
   async getUserProfile(userId: string) {
-    const r = await this.query(`select * from user_profiles where user_id = $1 limit 1`, [userId]);
-    return r?.rows?.[0] || undefined;
+    try {
+      if (process.env.PER_USER_TABLES === 'true') {
+        const tbl = this.getUserProfileTableName(userId);
+        await this.ensureUserProfileTable(userId);
+        const r = await this.query(`SELECT * FROM ${tbl} LIMIT 1`);
+        return r?.rows?.[0] || undefined;
+      }
+      const r = await this.query(`select * from user_profiles where user_id = $1 limit 1`, [userId]);
+      return r?.rows?.[0] || undefined;
+    } catch (e) {
+      console.warn('getUserProfile error', e);
+      return undefined;
+    }
   }
 
   async updateUserProfile(userId: string, updates: { displayName?: string; avatar?: string; socialProfiles?: any }): Promise<void> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      
+      if (process.env.PER_USER_TABLES === 'true') {
+        const tbl = this.getUserProfileTableName(userId);
+        await this.ensureUserProfileTable(userId);
+        // Try update first
+        const fields: string[] = [];
+        const vals: any[] = [];
+        let idx = 1;
+        if (updates.displayName !== undefined) { fields.push(`display_name = $${idx++}`); vals.push(updates.displayName); }
+        if (updates.avatar !== undefined) { fields.push(`avatar = $${idx++}`); vals.push(updates.avatar); }
+        if (updates.socialProfiles !== undefined) { fields.push(`social_profiles = $${idx++}`); vals.push(JSON.stringify(updates.socialProfiles)); }
+        if (fields.length > 0) {
+          fields.push(`updated_at = now()`);
+          const sql = `UPDATE ${tbl} SET ${fields.join(', ')}`;
+          await client.query(sql, vals);
+        }
+        await client.query('COMMIT');
+        return;
+      }
+
+      // Fallback to central table
+      await client.query('BEGIN');
       // Ensure user_profiles row exists
       await client.query(
         `INSERT INTO user_profiles (user_id, display_name, avatar, social_profiles)
@@ -976,12 +1063,12 @@ class NeonStorage implements IStorage {
          ON CONFLICT (user_id) DO NOTHING`,
         [userId, null, null, '{}']
       );
-      
+
       // Update user_profiles table with all fields
       const updateFields: string[] = [];
       const values: any[] = [];
       let paramIndex = 1;
-      
+
       if (updates.displayName !== undefined) {
         updateFields.push(`display_name = $${paramIndex++}`);
         values.push(updates.displayName);
@@ -994,7 +1081,7 @@ class NeonStorage implements IStorage {
         updateFields.push(`social_profiles = $${paramIndex++}`);
         values.push(JSON.stringify(updates.socialProfiles));
       }
-      
+
       if (updateFields.length > 0) {
         updateFields.push(`updated_at = now()`);
         values.push(userId);
@@ -1003,7 +1090,7 @@ class NeonStorage implements IStorage {
           values
         );
       }
-      
+
       await client.query('COMMIT');
     } catch (e) {
       await client.query('ROLLBACK');
@@ -1022,6 +1109,38 @@ class NeonStorage implements IStorage {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+
+      if (process.env.PER_USER_TABLES === 'true') {
+        const tbl = this.getUserProfileTableName(userId);
+        await this.ensureUserProfileTable(userId);
+        // Try selecting the single row for update
+        const cur = await client.query(`SELECT id, xp, level, quests_completed, tasks_completed FROM ${tbl} LIMIT 1 FOR UPDATE`);
+        let prevLevel = 0;
+        let newXp = xpAmount;
+        let newLevel = 0;
+        let questsCompleted = options?.questsCompletedInc || 0;
+        let tasksCompleted = options?.tasksCompletedInc || 0;
+        if (cur.rows.length) {
+          const row = cur.rows[0];
+          prevLevel = row.level || 0;
+          newXp = (row.xp || 0) + xpAmount;
+          const XP_PER_LEVEL = 100;
+          newLevel = Math.floor(newXp / XP_PER_LEVEL);
+          questsCompleted = (row.quests_completed || 0) + (options?.questsCompletedInc || 0);
+          tasksCompleted = (row.tasks_completed || 0) + (options?.tasksCompletedInc || 0);
+          await client.query(`UPDATE ${tbl} SET xp = $1, level = $2, quests_completed = $3, tasks_completed = $4, updated_at = now() WHERE id = $5`, [newXp, newLevel, questsCompleted, tasksCompleted, row.id]);
+        } else {
+          const XP_PER_LEVEL = 100;
+          newLevel = Math.floor(newXp / XP_PER_LEVEL);
+          questsCompleted = options?.questsCompletedInc || 0;
+          tasksCompleted = options?.tasksCompletedInc || 0;
+          await client.query(`INSERT INTO ${tbl} (xp, level, quests_completed, tasks_completed, created_at, updated_at) VALUES ($1,$2,$3,$4,now(),now())`, [newXp, newLevel, questsCompleted, tasksCompleted]);
+        }
+        try { console.log(`[NeonStorage] addXpToUser userId=${userId} xpAmount=${xpAmount} newXp=${newXp} prevLevel=${prevLevel} newLevel=${newLevel}`); } catch (e) { }
+        await client.query("COMMIT");
+        return { previousLevel: prevLevel, newLevel, xp: newXp, questsCompleted, tasksCompleted };
+      }
+
       const cur = await client.query(`select xp, level, quests_completed, tasks_completed from user_profiles where user_id = $1 for update`, [userId]);
       let prevLevel = 0;
       let newXp = xpAmount;
@@ -1050,11 +1169,7 @@ class NeonStorage implements IStorage {
           [userId, newXp, newLevel, questsCompleted, tasksCompleted]
         );
       }
-      try {
-        console.log(`[NeonStorage] addXpToUser userId=${userId} xpAmount=${xpAmount} newXp=${newXp} prevLevel=${prevLevel} newLevel=${newLevel}`);
-      } catch (e) {
-        /* ignore logging failures */
-      }
+      try { console.log(`[NeonStorage] addXpToUser userId=${userId} xpAmount=${xpAmount} newXp=${newXp} prevLevel=${prevLevel} newLevel=${newLevel}`); } catch (e) { }
       await client.query("COMMIT");
       return { previousLevel: prevLevel, newLevel, xp: newXp, questsCompleted, tasksCompleted };
     } catch (e) {
@@ -1066,20 +1181,55 @@ class NeonStorage implements IStorage {
   }
 
   async getLevelNftRecord(userId: string, level: number) {
-    const r = await this.query(`select * from user_level_nfts where user_id = $1 and level = $2 limit 1`, [userId, level]);
-    return r?.rows?.[0] || undefined;
+    try {
+      if (process.env.PER_USER_TABLES === 'true') {
+        const tbl = this.getUserLevelNftsTableName(userId);
+        await this.ensureUserLevelNftsTable(userId);
+        const r = await this.query(`SELECT * FROM ${tbl} WHERE level = $1 LIMIT 1`, [level]);
+        return r?.rows?.[0] || undefined;
+      }
+      const r = await this.query(`select * from user_level_nfts where user_id = $1 and level = $2 limit 1`, [userId, level]);
+      return r?.rows?.[0] || undefined;
+    } catch (e) {
+      console.warn('getLevelNftRecord error', e);
+      return undefined;
+    }
   }
 
   async createOrGetLevelNftRecord(record: { userId: string; level: number; metadataCid?: string; status?: string; jobId?: string; txHash?: string; tokenId?: string; metadataUri?: string }) {
-    const existing = await this.getLevelNftRecord(record.userId, record.level);
-    if (existing) return existing;
-    const r = await this.query(`insert into user_level_nfts (user_id, level, token_id, tx_hash, metadata_uri, metadata_cid, status, job_id, created_at) values ($1,$2,$3,$4,$5,$6,$7,$8,now()) returning *`, [record.userId, record.level, record.tokenId || null, record.txHash || null, record.metadataUri || null, record.metadataCid || null, record.status || 'queued', record.jobId || null]);
-    return r.rows[0];
+    try {
+      if (process.env.PER_USER_TABLES === 'true') {
+        const tbl = this.getUserLevelNftsTableName(record.userId);
+        await this.ensureUserLevelNftsTable(record.userId);
+        const existing = await this.query(`SELECT * FROM ${tbl} WHERE level = $1 LIMIT 1`, [record.level]);
+        if (existing && existing.rows && existing.rows.length) return existing.rows[0];
+        const r = await this.query(`INSERT INTO ${tbl} (level, token_id, tx_hash, metadata_uri, metadata_cid, status, job_id, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,now()) RETURNING *`, [record.level, record.tokenId || null, record.txHash || null, record.metadataUri || null, record.metadataCid || null, record.status || 'queued', record.jobId || null]);
+        return r.rows[0];
+      }
+      const existing = await this.getLevelNftRecord(record.userId, record.level);
+      if (existing) return existing;
+      const r = await this.query(`insert into user_level_nfts (user_id, level, token_id, tx_hash, metadata_uri, metadata_cid, status, job_id, created_at) values ($1,$2,$3,$4,$5,$6,$7,$8,now()) returning *`, [record.userId, record.level, record.tokenId || null, record.txHash || null, record.metadataUri || null, record.metadataCid || null, record.status || 'queued', record.jobId || null]);
+      return r.rows[0];
+    } catch (e) {
+      console.warn('createOrGetLevelNftRecord error', e);
+      throw e;
+    }
   }
 
   async upsertUserOAuth(userId: string, provider: string, data: any): Promise<void> {
-    // simple upsert into user_oauth_tokens table
     try {
+      if (process.env.PER_USER_TABLES === 'true') {
+        const tbl = this.getUserOauthTableName(userId);
+        await this.ensureUserOauthTable(userId);
+        const existing = await this.query(`SELECT provider FROM ${tbl} WHERE provider = $1 LIMIT 1`, [provider]);
+        if (existing && existing.rows && existing.rows.length) {
+          await this.query(`UPDATE ${tbl} SET access_token = $1, refresh_token = $2, scope = $3, expires_at = $4, updated_at = now() WHERE provider = $5`, [data.access_token || data.oauth_token || null, data.refresh_token || null, data.scope || null, data.expires_at ? new Date(data.expires_at) : null, provider]);
+        } else {
+          await this.query(`INSERT INTO ${tbl} (provider, access_token, refresh_token, scope, expires_at, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,now(),now())`, [provider, data.access_token || data.oauth_token || null, data.refresh_token || null, data.scope || null, data.expires_at ? new Date(data.expires_at) : null]);
+        }
+        return;
+      }
+      // simple upsert into user_oauth_tokens table
       const existing = await this.query(`select id from user_oauth_tokens where user_id = $1 and provider = $2 limit 1`, [userId, provider]);
       if (existing && existing.rows && existing.rows.length) {
         await this.query(`update user_oauth_tokens set access_token = $1, refresh_token = $2, scope = $3, expires_at = $4, updated_at = now() where user_id = $5 and provider = $6`, [data.access_token || data.oauth_token || null, data.refresh_token || null, data.scope || null, data.expires_at ? new Date(data.expires_at) : null, userId, provider]);
@@ -1093,6 +1243,12 @@ class NeonStorage implements IStorage {
 
   async getOAuthToken(userId: string, provider: string) {
     try {
+      if (process.env.PER_USER_TABLES === 'true') {
+        const tbl = this.getUserOauthTableName(userId);
+        await this.ensureUserOauthTable(userId);
+        const r = await this.query(`SELECT * FROM ${tbl} WHERE provider = $1 LIMIT 1`, [provider]);
+        return r?.rows?.[0] || undefined;
+      }
       const r = await this.query(`select * from user_oauth_tokens where user_id = $1 and provider = $2 limit 1`, [userId, provider]);
       return r?.rows?.[0] || undefined;
     } catch (e) {
@@ -1141,6 +1297,15 @@ class NeonStorage implements IStorage {
   // Campaign task methods
   async createCampaignTask(task: any): Promise<any> {
     const id = task.id || randomUUID();
+    const idVal = id;
+    if (process.env.PER_PROJECT_TABLES === 'true' && task.projectId) {
+      const pTbl = this.getProjectCampaignTasksTableName(task.projectId);
+      await this.ensureProjectCampaignTasksTable(task.projectId);
+      const sql = `INSERT INTO ${pTbl} (id, campaign_id, project_id, title, description, task_category, task_subtype, xp_reward, verification_config, is_active, order_index, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, NOW()) RETURNING *`;
+      const values = [idVal, task.campaignId, task.projectId, task.title, task.description, task.taskCategory, task.taskSubtype, task.xpReward || 0, typeof task.verificationConfig === 'string' ? task.verificationConfig : JSON.stringify(task.verificationConfig || {}), task.isActive !== undefined ? (task.isActive ? 1 : 0) : 1, task.orderIndex || 0];
+      const r = await this.query(sql, values);
+      return r.rows[0];
+    }
     const sql = `
       INSERT INTO campaign_tasks 
       (id, campaign_id, project_id, title, description, task_category, task_subtype, xp_reward, verification_config, is_active, order_index, created_at)
@@ -1148,7 +1313,7 @@ class NeonStorage implements IStorage {
       RETURNING *
     `;
     const values = [
-      id,
+      idVal,
       task.campaignId,
       task.projectId,
       task.title,
@@ -1170,6 +1335,16 @@ class NeonStorage implements IStorage {
   }
 
   async getCampaignTasks(campaignId: string): Promise<any[]> {
+    if (process.env.PER_PROJECT_TABLES === 'true') {
+      // lookup campaign to determine project_id
+      const c = await this.getCampaignById(campaignId);
+      if (c && c.project_id) {
+        const pTbl = this.getProjectCampaignTasksTableName(c.project_id);
+        await this.ensureProjectCampaignTasksTable(c.project_id);
+        const r = await this.query(`SELECT * FROM ${pTbl} WHERE campaign_id = $1 AND is_active = 1 ORDER BY order_index ASC, created_at ASC`, [campaignId]);
+        return r?.rows || [];
+      }
+    }
     const r = await this.query(
       `SELECT * FROM campaign_tasks WHERE campaign_id = $1 AND is_active = 1 ORDER BY order_index ASC, created_at ASC`,
       [campaignId]
@@ -1230,20 +1405,33 @@ class NeonStorage implements IStorage {
 
   async recordCampaignTaskCompletion(userId: string, taskId: string, campaignId: string, xpAwarded: number, verificationData?: any): Promise<void> {
     const id = randomUUID();
-    const sql = `
+    try {
+      if (process.env.PER_PROJECT_TABLES === 'true') {
+        // determine project id from campaign
+        const c = await this.getCampaignById(campaignId);
+        if (c && c.project_id) {
+          const tbl = this.getProjectCampaignTaskCompletionsTableName(c.project_id);
+          await this.ensureProjectCampaignTaskCompletionsTable(c.project_id);
+          const sql = `INSERT INTO ${tbl} (id, user_id, task_id, campaign_id, xp_awarded, verification_data, completed_at) VALUES ($1,$2,$3,$4,$5,$6,NOW())`;
+          const values = [id, userId, taskId, campaignId, xpAwarded, typeof verificationData === 'string' ? verificationData : JSON.stringify(verificationData || {})];
+          await this.query(sql, values);
+          return;
+        }
+      }
+
+      const sql = `
       INSERT INTO campaign_task_completions 
       (id, user_id, task_id, campaign_id, xp_awarded, verification_data, completed_at)
       VALUES ($1, $2, $3, $4, $5, $6, NOW())
     `;
-    const values = [
-      id,
-      userId,
-      taskId,
-      campaignId,
-      xpAwarded,
-      typeof verificationData === 'string' ? verificationData : JSON.stringify(verificationData || {}),
-    ];
-    try {
+      const values = [
+        id,
+        userId,
+        taskId,
+        campaignId,
+        xpAwarded,
+        typeof verificationData === 'string' ? verificationData : JSON.stringify(verificationData || {}),
+      ];
       await this.query(sql, values);
     } catch (e: any) {
       if (e?.code === '23505' || e?.message?.includes('unique')) {
@@ -1256,6 +1444,15 @@ class NeonStorage implements IStorage {
   }
 
   async getUserCampaignTaskCompletions(userId: string, campaignId?: string): Promise<string[]> {
+    if (process.env.PER_PROJECT_TABLES === 'true' && campaignId) {
+      const c = await this.getCampaignById(campaignId);
+      if (c && c.project_id) {
+        const tbl = this.getProjectCampaignTaskCompletionsTableName(c.project_id);
+        await this.ensureProjectCampaignTaskCompletionsTable(c.project_id);
+        const r = await this.query(`SELECT task_id FROM ${tbl} WHERE user_id = $1 AND campaign_id = $2`, [userId, campaignId]);
+        return (r?.rows || []).map((row: any) => row.task_id);
+      }
+    }
     const sql = campaignId
       ? `SELECT task_id FROM campaign_task_completions WHERE user_id = $1 AND campaign_id = $2`
       : `SELECT task_id FROM campaign_task_completions WHERE user_id = $1`;

@@ -33,7 +33,6 @@ interface Dapp {
   category: string;
   logo: string;
   questReward: string;
-  estimatedTime: string;
   isCompleted?: boolean;
   isClaimed?: boolean;
   websiteUrl: string;
@@ -50,8 +49,7 @@ export default function EcosystemDapps() {
       description: "Stake and make claims. Buy into claims bonding curves to support or negate a claim",
       category: "Portal",
       logo: intuitionPortalLogo,
-      questReward: "100 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://portal.intuition.systems"
@@ -62,8 +60,7 @@ export default function EcosystemDapps() {
       description: "A decentralized lending protocol and DEX for borrowing and swapping tokens on Intuition Testnet",
       category: "Lending Protocols",
       logo: oracleLendLogo,
-      questReward: "85 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://oraclelend.intuition.box"
@@ -74,8 +71,7 @@ export default function EcosystemDapps() {
       description: "Swap and stake $INTUIT token seamlessly",
       category: "DeFi",
       logo: intudexLogo,
-      questReward: "75 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://dex.intuition.box"
@@ -86,8 +82,7 @@ export default function EcosystemDapps() {
       description: "A decentralized lending protocol and DEX for borrowing and swaping tokens on Intuition Testnet",
       category: "DeFi",
       logo: oracleLendLogo,
-      questReward: "85 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://oraclelend.xyz"
@@ -99,7 +94,6 @@ export default function EcosystemDapps() {
       category: "Gaming",
       logo: diceGameLogo,
       questReward: "50 XP",
-      estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://dice.intuition.box"
@@ -112,8 +106,7 @@ export default function EcosystemDapps() {
       description: "Swap and stake different tokens seamlessly",
       category: "DeFi",
       logo: trustSwapLogo,
-      questReward: "70 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://trustswap.intuition.box"
@@ -124,8 +117,7 @@ export default function EcosystemDapps() {
       description: "A secure, decentralized escrow platform built on TRUST",
       category: "DeFi",
       logo: trustEscrowLogo,
-      questReward: "70 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://trustescrow.app"
@@ -136,8 +128,7 @@ export default function EcosystemDapps() {
       description: "Discover, create and mint NFTs",
       category: "NFT",
       logo: memkopadLogo,
-      questReward: "60 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://memkopad.app"
@@ -148,8 +139,7 @@ export default function EcosystemDapps() {
       description: "Defeat the eyes of the institution. An eerie, sci-fi shmup",
       category: "Gaming",
       logo: gazeBreakerLogo,
-      questReward: "80 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://gaze-breaker.vercel.app"
@@ -160,8 +150,7 @@ export default function EcosystemDapps() {
       description: "Play prediction games and minigames to earn INTUIT tokens on the Intuition Network",
       category: "Gaming",
       logo: intuitParkLogo,
-      questReward: "90 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://intuitpark.game"
@@ -172,8 +161,7 @@ export default function EcosystemDapps() {
       description: "Join tiles to reach 2048!",
       category: "Gaming",
       logo: twentyFortyEightLogo,
-      questReward: "45 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://2048.intuition.game"
@@ -184,8 +172,7 @@ export default function EcosystemDapps() {
       description: "Play Tetris, earn TRUST!",
       category: "Gaming",
       logo: tetrisLogo,
-      questReward: "55 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://tetris.intuition.game"
@@ -196,8 +183,7 @@ export default function EcosystemDapps() {
       description: "Launch Your Meme Token: Fair launch meme tokens with bonding curves on Intuition Testnet",
       category: "Launchpads",
       logo: intuitionMemeLogo,
-      questReward: "90 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://intuition-meme.vercel.app"
@@ -208,8 +194,7 @@ export default function EcosystemDapps() {
       description: "Place your bets and test your intuition",
       category: "Prediction Markets",
       logo: intuitionBetsLogo,
-      questReward: "80 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://bets.intuition.systems"
@@ -220,8 +205,7 @@ export default function EcosystemDapps() {
       description: "Discover Your On-Chain Prophecy",
       category: "Social",
       logo: intuitionOracleLogo,
-      questReward: "70 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://oracle.intuition.systems"
@@ -232,8 +216,7 @@ export default function EcosystemDapps() {
       description: "pray",
       category: "Social",
       logo: intuitionTempleLogo,
-      questReward: "60 XP",
-      estimatedTime: "15 min",
+      questReward: "50 XP",
       isCompleted: false,
       isClaimed: false,
       websiteUrl: "https://temple.intuition.systems"

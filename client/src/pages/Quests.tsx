@@ -86,12 +86,11 @@ export default function Quests() {
   const [connectedDiscord, setConnectedDiscord] = useState<boolean>(() => {
     try { return localStorage.getItem('nexura:connected:discord') === '1'; } catch(e){ return false; }
   });
-  // Server-provided canonical quests (replace hardcoded arrays)
-  const [quests, setQuests] = useState<any[]>([]);
-
-  // Local default quests: always show these in the UI as a fallback so the
-  // quests list is visible even when the backend /api/quests is unavailable.
-  // XP awarding and completed/claim state remain authoritative on the server.
+  // Local default quests: always show these in the UI. Quests are hardcoded
+  // in the client and do NOT come from the server. XP awarding and completed/
+  // claim state remain authoritative on the server (we still call /api/* for
+  // claim actions and completed lists), but the catalog below is the single
+  // source of truth for what is shown to users.
   const DEFAULT_QUESTS: any[] = [
     { id: 'daily-task-1', title: 'Verify Your Identity', description: 'Complete your identity verification process', xp: 50, reward: '50 XP', kind: 'daily', isActive: 1 },
     { id: 'daily-task-2', title: 'Join Community Discussion', description: 'Participate in at least one community discussion', xp: 50, reward: '50 XP', kind: 'daily', isActive: 1 },
@@ -115,46 +114,8 @@ export default function Quests() {
     { id: 'camp-support-claim', title: 'Support the Nexura Claim', description: 'Support the nexura claim on Intuition', xp: 50, reward: '50 XP', kind: 'campaign', url: 'https://testnet.portal.intuition.systems/explore/atom/0x985db42765efe28ba3ed6867fa7bd913955227898f6a665e34e3c9171885f1cc', actionLabel: 'Open Claim', isActive: 1 },
   ];
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        try { const token = localStorage.getItem('accessToken'); if (token) headers['Authorization'] = `Bearer ${token}`; } catch(e) {}
-        const res = await fetch(buildUrl('/api/quests'), { headers, credentials: 'include' });
-        let rows: any[] = [];
-        if (res.ok) {
-          const json = await res.json().catch(() => ({}));
-          rows = Array.isArray(json?.quests) ? json.quests : [];
-        }
-
-        // If server returns no rows or the request failed, fall back to DEFAULT_QUESTS
-        if (!rows || rows.length === 0) {
-          if (cancelled) return;
-          setQuests(DEFAULT_QUESTS);
-          return;
-        }
-
-        const normalized = rows.map((r: any) => ({
-          id: r.id,
-          title: r.title,
-          description: r.description,
-          xp: Number(r.xp || r.xp || 0) || 0,
-          reward: r.reward || r.reward_text || '',
-          kind: r.kind,
-          url: r.url,
-          actionLabel: r.action_label || r.actionLabel || '',
-          heroImage: r.hero_image || r.heroImage || '',
-          isActive: r.is_active ?? r.isActive ?? 1,
-        }));
-        if (cancelled) return;
-        setQuests(normalized);
-      } catch (e) {
-        console.warn('[Quests] failed to fetch canonical quests', e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  // Use hardcoded quests as the UI source of truth (do not fetch /api/quests)
+  const [quests] = useState<any[]>(DEFAULT_QUESTS);
 
   // Group quests by kind for the UI
   const featuredQuests = quests.filter(q => q.kind === 'featured');
@@ -443,9 +404,10 @@ export default function Quests() {
       {/* Hero Image */}
       <div className="relative h-48 overflow-hidden">
         <img 
-          src={quest.heroImage} 
+          src={quest.heroImage || gettingStartedImg} 
           alt={quest.title}
           className="w-full h-full object-cover transition-transform group-hover:scale-105"
+          onError={(e: any) => { try { e.target.src = gettingStartedImg; } catch{} }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
         
