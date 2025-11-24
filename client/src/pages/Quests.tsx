@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Calendar, Clock, Trophy, Target, CheckCircle, Plus } from "lucide-react";
@@ -8,71 +9,94 @@ import { useLocation } from "wouter";
 import dailyQuestImg from "@assets/generated_images/Daily_Quest_Completion_Image_83de888a.png";
 import gettingStartedImg from "@assets/generated_images/Getting_Started_Quest_Image_9a7ae50b.png";
 
+type Quest = {
+  id: string;
+  title: string;
+  description: string;
+  reward: {
+    xp: number;
+    trust: number;
+  };
+  done: boolean;
+};
+
 export default function Quests() {
   const [activeTab, setActiveTab] = useState("active");
   const [, setLocation] = useLocation();
   const [claimedTasks, setClaimedTasks] = useState<string[]>([]);
+  const [oneTimeQuests, setOneTimeQuests] = useState<Quest[]>([]);
+  const [activeQuestTasks, setActiveQuestTasks] = useState<Quest[]>([]);
 
   // Active/Weekly Quest Tasks (formerly Daily)
-  const activeQuestTasks = [
-    {
-      id: "active-task-1",
-      title: "Verify Your Identity",
-      description: "Complete your identity verification process",
-      reward: "10 XP",
-      completed: false
-    },
-    {
-      id: "active-task-2", 
-      title: "Join Community Discussion",
-      description: "Participate in at least one community discussion",
-      reward: "15 XP",
-      completed: false
-    },
-    {
-      id: "active-task-3",
-      title: "Share Intuition Project",
-      description: "Share an Intuition project with the community",
-      reward: "20 XP",
-      completed: false
-    },
-    {
-      id: "active-task-4",
-      title: "Create an Attestation",
-      description: "Make your first attestation on the Intuition platform",
-      reward: "25 XP",
-      completed: false
-    }
-  ];
+  // const activeQuestTasks = [
+  //   {
+  //     id: "active-task-1",
+  //     title: "Verify Your Identity",
+  //     description: "Complete your identity verification process",
+  //     reward: "10 XP",
+  //     completed: false
+  //   },
+  //   {
+  //     id: "active-task-2", 
+  //     title: "Join Community Discussion",
+  //     description: "Participate in at least one community discussion",
+  //     reward: "15 XP",
+  //     completed: false
+  //   },
+  //   {
+  //     id: "active-task-3",
+  //     title: "Share Intuition Project",
+  //     description: "Share an Intuition project with the community",
+  //     reward: "20 XP",
+  //     completed: false
+  //   },
+  //   {
+  //     id: "active-task-4",
+  //     title: "Create an Attestation",
+  //     description: "Make your first attestation on the Intuition platform",
+  //     reward: "25 XP",
+  //     completed: false
+  //   }
+  // ];
 
-  const oneTimeQuests = [
-    {
-      id: "onetime-1",
-      title: "Connect X",
-      description: "Link your X account to verify your identity and join the community",
-      reward: "25 XP",
-      completed: false
-    },
-    {
-      id: "onetime-2",
-      title: "Connect Discord",
-      description: "Join our Discord community to access exclusive channels and updates",
-      reward: "25 XP",
-      completed: false
-    },
-    {
-      id: "onetime-3",
-      title: "Own a .trust domain",
-      description: "Register your .trust domain to establish your presence on the Intuition network",
-      reward: "50 XP",
-      completed: false
-    }
-  ];
+  // const oneTimeQuests = [
+  //   {
+  //     id: "onetime-1",
+  //     title: "Connect X",
+  //     description: "Link your X account to verify your identity and join the community",
+  //     reward: "25 XP",
+  //     completed: false
+  //   },
+  //   {
+  //     id: "onetime-2",
+  //     title: "Connect Discord",
+  //     description: "Join our Discord community to access exclusive channels and updates",
+  //     reward: "25 XP",
+  //     completed: false
+  //   },
+  //   {
+  //     id: "onetime-3",
+  //     title: "Own a .trust domain",
+  //     description: "Register your .trust domain to establish your presence on the Intuition network",
+  //     reward: "50 XP",
+  //     completed: false
+  //   }
+  // ];
 
-  const handleClaimTask = (taskId: string) => {
+  useEffect(() => {
+    (async () => {
+      const questsResponse = await apiRequest("GET", "/api/quests");
+      setOneTimeQuests(questsResponse.oneTimeQuests);
+      setActiveQuestTasks(questsResponse.activeQuestTasks);
+    })();
+  }, []);
+
+  const handleClaimTask = async (taskId: string) => {
     if (!claimedTasks.includes(taskId)) {
       setClaimedTasks(prev => [...prev, taskId]);
     }
+
+    await apiRequest("POST", "/api/quests/claimTask", { taskId });
   };
 
   const renderQuestCard = (quest: any, showProgress = false) => (
@@ -187,16 +211,16 @@ export default function Quests() {
             
             {/* Active Tasks List */}
             <div className="space-y-4">
-              {activeQuestTasks.map((task) => (
+              {activeQuestTasks.map((task: { id: string; title: string; description: string; reward: Record<string, number>; done: boolean; }) => (
                 <Card key={task.id} className="p-6" data-testid={`active-task-${task.id}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                        claimedTasks.includes(task.id) 
+                        task.done 
                           ? 'bg-green-500 border-green-500' 
                           : 'border-gray-300'
                       }`}>
-                        {claimedTasks.includes(task.id) && (
+                        {task.done && (
                           <CheckCircle className="w-4 h-4 text-white" />
                         )}
                       </div>
@@ -208,16 +232,16 @@ export default function Quests() {
                     
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
-                        <div className="font-semibold text-primary">{task.reward}</div>
+                        <div className="font-semibold text-primary">{task.reward.xp + " XP" + " + " + task.reward.trust + " trust"}</div>
                       </div>
                       <Button 
                         size="sm"
-                        variant={claimedTasks.includes(task.id) ? "outline" : "quest"}
-                        disabled={claimedTasks.includes(task.id)}
+                        variant={task.done ? "outline" : "quest"}
+                        disabled={task.done}
                         onClick={() => handleClaimTask(task.id)}
                         data-testid={`claim-task-${task.id}`}
                       >
-                        {claimedTasks.includes(task.id) ? 'Claimed' : 'Claim'}
+                        {task.done ? 'Claimed' : 'Claim'}
                       </Button>
                     </div>
                   </div>
@@ -231,12 +255,12 @@ export default function Quests() {
                 <div>
                   <h3 className="font-bold text-foreground">Active Progress</h3>
                   <p className="text-sm text-muted-foreground">
-                    {claimedTasks.length} of {activeQuestTasks.length} tasks completed
+                    {activeQuestTasks.filter(task => task.done).length} of {activeQuestTasks.length} tasks completed
                   </p>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-primary">
-                    {Math.round((claimedTasks.length / activeQuestTasks.length) * 100)}%
+                    {Math.round((activeQuestTasks.filter(task => task.done).length / activeQuestTasks.length) * 100)}%
                   </div>
                   <div className="text-xs text-muted-foreground">Complete</div>
                 </div>
@@ -252,19 +276,19 @@ export default function Quests() {
                 Complete these essential quests to unlock the full NEXURA experience
               </p>
             </div>
-            
+
             {/* One Time Quests List */}
             <div className="space-y-4">
-              {oneTimeQuests.map((quest) => (
+              {oneTimeQuests.map((quest: { id: string; title: string; description: string; reward: Record<string, number>; done: boolean; }) => (
                 <Card key={quest.id} className="p-6" data-testid={`onetime-task-${quest.id}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                        claimedTasks.includes(quest.id) 
+                        quest.done 
                           ? 'bg-green-500 border-green-500' 
                           : 'border-gray-300'
                       }`}>
-                        {claimedTasks.includes(quest.id) && (
+                        {quest.done && (
                           <CheckCircle className="w-4 h-4 text-white" />
                         )}
                       </div>
@@ -276,16 +300,16 @@ export default function Quests() {
                     
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
-                        <div className="font-semibold text-primary">{quest.reward}</div>
+                        <div className="font-semibold text-primary">{quest.reward.xp + " XP" + " + " + quest.reward.tTrust + " trust"}</div>
                       </div>
                       <Button 
                         size="sm"
-                        variant={claimedTasks.includes(quest.id) ? "outline" : "quest"}
-                        disabled={claimedTasks.includes(quest.id)}
+                        variant={quest.done ? "outline" : "quest"}
+                        disabled={quest.done}
                         onClick={() => handleClaimTask(quest.id)}
                         data-testid={`claim-quest-${quest.id}`}
                       >
-                        {claimedTasks.includes(quest.id) ? 'Claimed' : 'Claim'}
+                        {quest.done ? 'Claimed' : 'Claim'}
                       </Button>
                     </div>
                   </div>
@@ -299,12 +323,12 @@ export default function Quests() {
                 <div>
                   <h3 className="font-bold text-foreground">One Time Progress</h3>
                   <p className="text-sm text-muted-foreground">
-                    {oneTimeQuests.filter(q => claimedTasks.includes(q.id)).length} of {oneTimeQuests.length} quests completed
+                    {oneTimeQuests.filter(q => q.done).length} of {oneTimeQuests.length} quests completed
                   </p>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-primary">
-                    {Math.round((oneTimeQuests.filter(q => claimedTasks.includes(q.id)).length / oneTimeQuests.length) * 100)}%
+                    {Math.round((oneTimeQuests.filter(q => q.done).length / oneTimeQuests.length) * 100)}%
                   </div>
                   <div className="text-xs text-muted-foreground">Complete</div>
                 </div>
