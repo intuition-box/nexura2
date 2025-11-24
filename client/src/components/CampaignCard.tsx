@@ -61,20 +61,18 @@ export default function CampaignCard({
 
   return (
     <Card 
-      className="overflow-hidden glass glass-hover cursor-pointer group relative rounded-3xl hover:-translate-y-1 transition-all duration-300" 
+      className="overflow-hidden hover-elevate cursor-pointer group relative" 
       onClick={handleClick}
       data-testid={`campaign-card-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-      
       {/* Hero Image */}
       <div className="relative h-48 overflow-hidden">
         <img 
           src={heroImage} 
           alt={title}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+          className="w-full h-full object-cover transition-transform group-hover:scale-105"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
         
         {/* Participant Count Overlay */}
         <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1">
@@ -121,21 +119,6 @@ export default function CampaignCard({
             <div>to {formatDate(endDate)}</div>
           </div>
         </div>
-
-        {/* Reward Pool */}
-        {rewardPool && (
-          <div className="border-t border-card-border pt-4">
-            <div className="text-sm text-muted-foreground mb-1">Rewards</div>
-            <div className="flex items-center space-x-2">
-              <span className="text-blue-500 font-bold">5XP</span>
-              <span className="text-muted-foreground">+</span>
-              <div className="flex items-center space-x-1">
-                <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
-                <span className="font-bold text-card-foreground">{rewardPool.amount} {rewardPool.token}</span>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </Card>
   );

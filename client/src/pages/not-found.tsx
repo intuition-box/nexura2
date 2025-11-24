@@ -1,12 +1,10 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
-import AnimatedBackground from "@/components/AnimatedBackground";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-black text-white relative">
-      <AnimatedBackground />
-      <Card className="w-full max-w-md mx-4 glass rounded-3xl relative z-10">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
+      <Card className="w-full max-w-md mx-4">
         <CardContent className="pt-6">
           <div className="flex mb-4 gap-2">
             <AlertCircle className="h-8 w-8 text-red-500" />

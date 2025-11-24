@@ -1,312 +1,188 @@
-import { useMemo, memo, useState, useEffect } from "react";
-import { useWallet } from "@/hooks/use-wallet";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Edit2, Calendar } from "lucide-react";
-import { Link } from "wouter";
-import { useAuth } from "@/lib/auth";
-import { XP_PER_LEVEL } from "@shared/schema";
 import { Progress } from "@/components/ui/progress";
-import { emitSessionChange } from "@/lib/session";
-import AnimatedBackground from "@/components/AnimatedBackground";
+import { Calendar } from "lucide-react";
+import { Link } from "wouter";
 
-// Prefer a runtime-injected backend URL (window.__BACKEND_URL__), then Vite env var.
-// Do not default to localhost here — if no backend is configured the app will
-// make relative requests to the current origin.
-const RUNTIME_BACKEND = (typeof window !== 'undefined' && (window as any).__BACKEND_URL__) || undefined;
-const BACKEND_BASE = RUNTIME_BACKEND || ((import.meta as any).env?.VITE_BACKEND_URL as string) || "";
+// User Analytics Data
+const userAnalytics = {
+  xp: 175,
+  level: 8,
+  badges: 3,
+  questsCompleted: 12,
+  tTrustEarned: 6.0
+};
 
-function buildUrl(path: string) {
-  if (/^https?:\/\//i.test(path)) return path;
-  const base = BACKEND_BASE.replace(/\/+$|\\s+/g, "");
-  const p = path.replace(/^\/+/, "");
-  return `${base}/${p}`;
-}
-
-function WalletDropdown() {
-  const { isConnected, connectWallet, address, disconnect } = useWallet();
-  const { signOut } = useAuth();
-
-  if (!isConnected) {
-    return (
-      <Button size="sm" onClick={async () => { try { await connectWallet(); } finally { try { emitSessionChange(); } catch(e){} } }}>
-        Connect Wallet
-      </Button>
-    );
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">{address ? `${address.slice(0,6)}...${address.slice(-4)}` : "Profile"}</Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48 p-2">
-        <DropdownMenuItem asChild>
-          <Link href="/profile" className="w-full cursor-pointer p-2 text-base">My Profile</Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => { try { disconnect(); } catch(e){}; try { signOut(); } catch(e){}; try { emitSessionChange(); } catch(e){}; }} className="cursor-pointer p-2 text-base">
-          Log Out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+// Updated level achievements with new titles (Level 1–10)
+const levelAchievementsInitial = [
+  { level: 1, title: "Trail Initiate", xpRequired: 100, color: "#8b5cf6", unlocked: true },
+  { level: 2, title: "Pathfinder", xpRequired: 300, color: "#6b7280", unlocked: false },
+  { level: 3, title: "Scout of Lore", xpRequired: 600, color: "#6b7280", unlocked: false },
+  { level: 4, title: "Relic Runner", xpRequired: 1000, color: "#6b7280", unlocked: false },
+  { level: 5, title: "Rune Raider", xpRequired: 1500, color: "#6b7280", unlocked: false },
+  { level: 6, title: "Vault Sever", xpRequired: 2100, color: "#6b7280", unlocked: false },
+  { level: 7, title: "Crypt Diver", xpRequired: 2800, color: "#6b7280", unlocked: false },
+  { level: 8, title: "Temple Warden", xpRequired: 3600, color: "#6b7280", unlocked: false },
+  { level: 9, title: "Relic Master", xpRequired: 4500, color: "#6b7280", unlocked: false },
+  { level: 10, title: "Nexon Vanguard", xpRequired: 5500, color: "#6b7280", unlocked: false }
+];
 
 export default function Profile() {
-  try {
-    const { user, loading } = useAuth();
-    const [referralCount, setReferralCount] = useState<number>(0);
-    const [loadingReferrals, setLoadingReferrals] = useState(false);
-
-    // Safety check - prevent rendering if user is not an object or is invalid
-    if (user && (typeof user !== 'object' || Array.isArray(user) || user === null)) {
-      console.error('[Profile] Invalid user data type:', typeof user, user);
-      return (
-        <div className="min-h-screen bg-background overflow-auto p-6 flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold mb-4">Error loading profile</h2>
-            <p className="text-muted-foreground mb-6">Invalid user data received. Please clear your browser cache and reload.</p>
-            <Button onClick={() => { localStorage.clear(); sessionStorage.clear(); window.location.href = '/'; }}>Clear Cache &amp; Reload</Button>
-          </div>
-        </div>
-      );
-    }
-
-  // Fetch referral stats when user is available
-  useEffect(() => {
-    if (user?.id) {
-      setLoadingReferrals(true);
-      fetch(buildUrl(`/api/referrals/stats/${user.id}`), { credentials: 'include' })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data?.totalReferrals !== undefined) {
-            setReferralCount(data.totalReferrals);
-          }
-        })
-        .catch(err => console.warn('Failed to fetch referral stats:', err))
-        .finally(() => setLoadingReferrals(false));
-    }
-  }, [user?.id]);
-
-  // Always show profile with safe defaults - never block on loading
-  // This prevents crashes and provides a better UX
-  const userData = useMemo(() => {
-    if (!user) {
-      return {
-        id: "",
-        username: "Guest",
-        displayName: "Guest User",
-        avatar: "",
-        level: 1,
-        xp: 0,
-        questsCompleted: 0,
-        quests_completed: 0,
-        tasksCompleted: 0,
-        tasks_completed: 0,
-        dateJoined: "Recently",
+const [userData] = useState(() => {
+  const saved = localStorage.getItem("user_profile");
+  return saved
+    ? JSON.parse(saved)
+    : {
+        username: "0xD524...9779",
+        displayName: "0xD524...9779",
+        joinedDate: "Nov 2024",
       };
-    }
-    return {
-      ...user,
-      level: user.level ?? 1,
-      xp: user.xp ?? 0,
-      questsCompleted: user.questsCompleted ?? user.quests_completed ?? 0,
-      tasksCompleted: user.tasksCompleted ?? user.tasks_completed ?? 0,
-      displayName: user.displayName ?? user.display_name ?? user.username ?? "User",
-      username: user.username ?? "user",
-      dateJoined: user.dateJoined ?? user.created_at ?? "Recently",
-    };
-  }, [user]);
+});
 
-  // Use server-provided profile fields only (fall back to defaults above)
-  const { levelValue, xpValue, nextLevelXp, progressXp, neededXp, progressPercentage } = useMemo(() => {
-    const level = Math.max(1, Number(userData?.level) || 1);
-    const xp = Math.max(0, Number(userData?.xp) || 0);
-    const nextLvlXp = (level + 1) * XP_PER_LEVEL;
-    const currentLvlXp = level * XP_PER_LEVEL;
-    const progXp = Math.max(0, xp - currentLvlXp);
-    const needXp = Math.max(0, nextLvlXp - xp);
-    const progPct = XP_PER_LEVEL > 0 ? Math.min(100, (progXp / XP_PER_LEVEL) * 100) : 0;
-    
-    return {
-      levelValue: level,
-      xpValue: xp,
-      nextLevelXp: nextLvlXp,
-      progressXp: progXp,
-      neededXp: needXp,
-      progressPercentage: progPct
-    };
-  }, [userData]);
+
+  const [userXp, setUserXp] = useState(100);
+  const [levelAchievements, setLevelAchievements] = useState(levelAchievementsInitial);
+
+  const nextLevelToMint = levelAchievements.find(
+    (l) => userXp >= l.xpRequired && !l.unlocked
+  );
+
+  const handleMint = (level) => {
+    setLevelAchievements((prev) =>
+      prev.map((l) => (l.level === level ? { ...l, unlocked: true } : l))
+    );
+
+    const completedLevel = levelAchievements.find((l) => l.level === level);
+    if (completedLevel) {
+      const excessXp = userXp - completedLevel.xpRequired;
+      setUserXp(excessXp);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-auto p-6 scale-in relative" data-testid="profile-page">
-      <AnimatedBackground />
-      {loading && (
-        <div className="fixed top-4 right-4 z-50 bg-background/80 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
-          <div className="flex items-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-            <span className="text-sm text-muted-foreground">Loading...</span>
-          </div>
-        </div>
-      )}
-      <div className="max-w-4xl mx-auto space-y-8 relative z-10">
+    <div className="min-h-screen bg-background overflow-auto p-6">
+      <div className="max-w-5xl mx-auto space-y-10">
+
+        {/* ---------------------------- PROFILE HEADER ---------------------------- */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-3xl font-bold text-white">My Profile</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link href="/profile/edit">
-              <Button data-testid="button-edit-profile">
-                <Edit2 className="w-4 h-4 mr-2" />
-                Edit Profile
-              </Button>
-            </Link>
-
-            {/* Level display */}
-            <div className="hidden sm:flex items-center gap-3 glass-card p-3 float">
-              <div className="flex items-center gap-2">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-purple-700 via-blue-600 to-cyan-500 shadow-lg">
-                  <span className="text-sm font-bold text-white">{levelValue}</span>
-                </div>
-                <div className="text-sm">
-                  <div className="text-xs text-muted-foreground">Level</div>
-                  <div className="text-sm font-semibold">{levelValue}</div>
-                </div>
-              </div>
-              <div className="pl-2 border-l border-border">
-                <div className="text-xs text-muted-foreground">XP</div>
-                <div className="text-sm font-semibold">{xpValue}</div>
-              </div>
-            </div>
-
-            {/* Wallet connect/status dropdown */}
-            <WalletDropdown />
-          </div>
+          <h1 className="text-3xl font-bold text-foreground">My Profile</h1>
+          <Link href="/profile/edit">
+            <Button>Edit Profile</Button>
+          </Link>
         </div>
 
-        <Card className="relative overflow-hidden card-lift glow-border">
-          <div 
-            className="absolute inset-0 opacity-30"
-            style={{
-              background: `linear-gradient(135deg, #5B21B6, #3B82F6, #06B6D4, #8B5CF6)`,
-              backgroundSize: '400% 400%',
-              animation: 'gradientShift 15s ease infinite'
-            }}
-          />
-
-          <CardContent className="relative p-8">
+        <Card className="relative overflow-hidden">
+          <CardContent className="p-8">
             <div className="flex items-start space-x-6">
-              <div className="relative shimmer">
-                <Avatar className="w-32 h-32 border-4 border-white/20 shadow-2xl">
-                  <AvatarImage src={userData?.avatar ?? ""} />
-                  <AvatarFallback className="text-3xl font-bold bg-gradient-to-br from-green-500 via-blue-500 to-red-500 text-white">
-                    {levelValue || 1}
-                  </AvatarFallback>
-                </Avatar>
-                <div 
-                  className="absolute -bottom-2 -right-2 w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold border-4 border-background bg-gradient-to-br from-purple-700 via-blue-600 to-cyan-500 shadow-xl"
-                >
-                  {levelValue}
-                </div>
-              </div>
+              <Avatar className="w-32 h-32 border-4 border-background">
+                <AvatarImage src="" />
+                <AvatarFallback className="text-3xl font-bold bg-gradient-to-br from-green-500 via-blue-500 to-red-500 text-white">
+                  {userData.displayName.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
 
               <div className="flex-1 space-y-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground">{userData?.displayName ?? userData?.username ?? "Guest"}</h2>
-                  <Badge 
-                    className="mt-2 text-white border-0 bg-gradient-to-r from-purple-700 via-blue-600 to-cyan-500 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-                  >
-                    Level {levelValue}
-                  </Badge>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">XP Progress</span>
-                    <span className="text-sm font-medium">{xpValue} / {nextLevelXp} XP</span>
-                  </div>
-                  <Progress 
-                    value={progressPercentage} 
-                    className="h-3 bg-gray-800/50 overflow-hidden rounded-full"
-                  />
-                  <div className="text-xs text-muted-foreground">
-                    {neededXp} XP to next level
-                  </div>
-                </div>
+                <h2 className="text-2xl font-bold">{userData.displayName}</h2>
 
                 <div className="flex items-center text-sm text-muted-foreground">
                   <Calendar className="w-4 h-4 mr-2" />
-                  Joined {userData?.dateJoined ?? "recently"}
+                  Joined {userData.joinedDate}
                 </div>
+              </div>
+
+              <div className="text-right">
+                <div className="text-sm text-muted-foreground">User ID</div>
+                <div className="text-sm font-mono">{userData.username}</div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="glass glass-hover rounded-3xl" data-testid="stat-quests">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-bold text-white">Quests</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{userData?.questsCompleted ?? userData?.quests_completed ?? 0}</div>
-              <p className="text-xs text-white/60 mt-1">Completed</p>
-            </CardContent>
-          </Card>
+        {/* ---------------------------- USER ANALYTICS ---------------------------- */}
+        <section>
+          <h2 className="text-2xl font-bold mb-4">User Analytics</h2>
 
-          <Card className="glass glass-hover rounded-3xl" data-testid="stat-tasks">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-bold text-white">Tasks</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{userData?.tasksCompleted ?? userData?.tasks_completed ?? 0}</div>
-              <p className="text-xs text-white/60 mt-1">Completed</p>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Total XP</p><p className="text-2xl font-bold">{userAnalytics.xp}</p></CardContent></Card>
+            <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Level</p><p className="text-2xl font-bold">{userAnalytics.level}</p></CardContent></Card>
+            <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Badges</p><p className="text-2xl font-bold">{userAnalytics.badges}</p></CardContent></Card>
+            <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Quests Completed</p><p className="text-2xl font-bold">{userAnalytics.questsCompleted}</p></CardContent></Card>
+            <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">tTRUST Earned</p><p className="text-2xl font-bold">{userAnalytics.tTrustEarned}</p></CardContent></Card>
+          </div>
+        </section>
 
-          <Card className="glass glass-hover rounded-3xl" data-testid="stat-total-xp">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-bold text-white">Total XP</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{xpValue}</div>
-              <p className="text-xs text-white/60 mt-1">XP earned</p>
-            </CardContent>
-          </Card>
+        {/* ---------------------------- ACHIEVEMENTS / LEVELS ---------------------------- */}
+        <section>
+          <h2 className="text-2xl font-bold mb-4">Achievements</h2>
 
-          <Card className="glass glass-hover rounded-3xl" data-testid="stat-referrals">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-bold text-white">Referrals</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{loadingReferrals ? '...' : referralCount}</div>
-              <p className="text-xs text-white/60 mt-1">Friends referred</p>
-            </CardContent>
-          </Card>
-        </div>
+          <div className="flex flex-col gap-6">
+            {levelAchievements.map((achievement) => {
+              const progress = Math.min((userXp / achievement.xpRequired) * 100, 100);
+              const isUnlocked = achievement.unlocked;
+              const canMint = nextLevelToMint?.level === achievement.level;
+
+              return (
+                <Card
+                  key={achievement.level}
+                  className={`${isUnlocked ? "border-primary/50 bg-primary/5" : ""}`}
+                >
+                  <CardContent className="p-6 relative">
+                    {canMint && (
+                      <button
+                        onClick={() => handleMint(achievement.level)}
+                        className="absolute top-3 right-3 bg-green-500 text-white px-3 py-1 rounded text-xs font-semibold hover:bg-green-600"
+                      >
+                        Mint
+                      </button>
+                    )}
+
+                    <div className="flex items-center justify-between mb-4">
+                      <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold"
+                        style={{ backgroundColor: isUnlocked ? achievement.color : "#6b7280" }}
+                      >
+                        {achievement.level}
+                      </div>
+
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">{Math.floor(progress)}%</p>
+                        {isUnlocked && <Badge className="bg-green-500 mt-1">Unlocked</Badge>}
+                      </div>
+                    </div>
+
+                    <h3 className="font-bold text-lg mb-1">{achievement.title}</h3>
+
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Complete {achievement.title} by earning {achievement.xpRequired} XP
+                    </p>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Progress</span>
+                        <span>
+                          {Math.min(userXp, achievement.xpRequired)} / {achievement.xpRequired}
+                        </span>
+                      </div>
+
+                      <Progress
+                        value={progress}
+                        className="h-2"
+                        style={{
+                          "--progress-background": isUnlocked ? achievement.color : "#6b7280",
+                        }}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+
       </div>
     </div>
   );
-  } catch (error) {
-    console.error('[Profile] Render error:', error);
-    return (
-      <div className="min-h-screen bg-background overflow-auto p-6 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Profile Error</h2>
-          <p className="text-muted-foreground mb-6">Something went wrong. Please clear your browser cache.</p>
-          <Button onClick={() => { localStorage.clear(); sessionStorage.clear(); window.location.href = '/'; }}>Clear Cache &amp; Reload</Button>
-        </div>
-      </div>
-    );
-  }
 }

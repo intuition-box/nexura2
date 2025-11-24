@@ -70,19 +70,18 @@ export default function HeroCampaign({ campaigns }: HeroCampaignProps) {
 
   return (
     <div 
-      className="relative h-96 glass rounded-3xl overflow-hidden mb-8 cursor-pointer group"
+      className="relative h-96 bg-gradient-to-br from-purple-900/50 via-purple-800/30 to-blue-900/50 rounded-2xl overflow-hidden mb-8 cursor-pointer hover:scale-[1.02] transition-transform duration-200"
       onClick={handleCampaignClick}
       data-testid="hero-campaign-card"
     >
       {/* Background Image */}
       <div 
-        className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
+        className="absolute inset-0 bg-cover bg-center opacity-20"
         style={{ backgroundImage: `url(${currentCampaign.heroImage})` }}
       />
       
       {/* Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-purple-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="absolute inset-0 bg-gradient-to-r from-purple-900/60 via-transparent to-transparent" />
 
       {/* Navigation Arrows */}
       <button
@@ -90,7 +89,7 @@ export default function HeroCampaign({ campaigns }: HeroCampaignProps) {
           e.stopPropagation();
           prevCampaign();
         }}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 glass hover:bg-white/20 rounded-full flex items-center justify-center transition-all duration-300"
+        className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center transition-colors"
         data-testid="button-prev-campaign"
       >
         <ChevronLeft className="w-5 h-5 text-white" />
@@ -101,7 +100,7 @@ export default function HeroCampaign({ campaigns }: HeroCampaignProps) {
           e.stopPropagation();
           nextCampaign();
         }}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 glass hover:bg-white/20 rounded-full flex items-center justify-center transition-all duration-300"
+        className="absolute right-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center transition-colors"
         data-testid="button-next-campaign"
       >
         <ChevronRight className="w-5 h-5 text-white" />
