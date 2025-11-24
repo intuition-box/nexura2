@@ -1,10 +1,35 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
+import { useEffect, useState } from "react";
+import { apiRequest } from "@/lib/queryClient"; 
 import { useLocation } from "wouter";
+
+type Task = {
+  id: string;
+  task: string;
+  xp: string;
+  link: string;
+};
+
+type CampaignCompleted = {
+  tasksCompleted: boolean;
+  campaignCmpleted: boolean;
+};
 
 export default function CampaignEnvironment() {
   const [, setLocation] = useLocation();
+  const [tasks, setCampaignTasks] = useState<Task[]>([]);
+  const [campaignCompleted, setCampaignCompleted] = useState<CampaignCompleted>();
+
+  const campaignId = "12"; // get campaign id from search
+  useEffect(() => {
+    (async () => {
+      const campaignTasks = await apiRequest("GET", `/api/campaign/tasks?id=${campaignId}`);
+      setCampaignTasks(campaignTasks.tasks)
+      setCampaignCompleted(campaignTasks.campaignCompleted);
+    })();
+  }, []);
 
   // Determine back navigation based on referrer or query param
   const getBackLocation = () => {
@@ -23,6 +48,16 @@ export default function CampaignEnvironment() {
       return 'Back to Explore';
     }
     return 'Back to Campaigns';
+  };
+
+  const performCampaignTask = async () => {
+    await apiRequest("POST", `/api/campaign/performTask?id=${campaignId}`);
+  };
+
+  const claimReward = async () => {
+    // use the user wallet to connect to the smart contract and call the claim fn
+
+    await apiRequest("POST", `/api/campaign/claim?id=${campaignId}`);
   };
 
   return (
