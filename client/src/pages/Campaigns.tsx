@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,79 +8,108 @@ import campaignLaunchImg from "@assets/generated_images/Campaign_Launch_Image_67
 import attestationMasteryImg from "@assets/generated_images/Attestation_Mastery_Quest_Image_6ca48d9a.png";
 import trustNetworkImg from "@assets/generated_images/Trust_Network_Campaign_Image_a68c295f.png";
 import developerAdoptionImg from "@assets/generated_images/Developer_Adoption_Campaign_Image_f372ebd6.png";
+import { apiRequest } from "@/lib/queryClient";
+
+type Campaign = {
+  id: string;
+  title: string;
+  description: string;
+  participants: number;
+  startDate: string;
+  endDate: string;
+  status: string;
+  category: string;
+  projectCoverImage: string;
+  nameOfProject: string;
+  reward?: {
+    xp: string;
+    trust: string;
+  };
+}
 
 export default function Campaigns() {
   const [, setLocation] = useLocation();
+  const [activeCampaigns, setActiveCampaigns] = useState<Campaign[]>([])
+  // const [upcomingCampaigns, setUpcomingCampaigns] = useState<Campaign[]>([])
 
-  const activeCampaigns = [
-    {
-      id: "intuition-core-campaign",
-      title: "Intuition Core Experience",
-      description: "Explore the revolutionary trust and reputation system built for the decentralized future. Join thousands of early adopters.",
-      projectName: "Intuition",
-      participants: 3200,
-      // rewardPool: "100,000 tTRUST",
-      startDate: "Sep 19, 2024",
-      endDate: "Nov 19, 2024",
-      status: "Active",
-      category: "Platform Launch",
-      heroImage: campaignLaunchImg
-    },
-    {
-      id: "attestation-master-campaign", 
-      title: "Attestation Master Challenge",
-      description: "Master the art of creating meaningful attestations and build your reputation on Intuition.",
-      projectName: "Intuition",
-      participants: 1850,
-      // rewardPool: "50,000 tTRUST",
-      startDate: "Sep 25, 2024",
-      endDate: "Oct 25, 2024",
-      status: "Active",
-      category: "Skill Building",
-      heroImage: attestationMasteryImg
-    },
-    {
-      id: "trust-network-campaign",
-      title: "Trust Network Expansion",
-      description: "Help expand the trust network by creating quality attestations and building meaningful connections.",
-      projectName: "Intuition",
-      participants: 950,
-      // rewardPool: "25,000 tTRUST",
-      startDate: "Oct 5, 2024",
-      endDate: "Nov 5, 2024",
-      status: "Active",
-      category: "Network Growth",
-      heroImage: trustNetworkImg
-    }
-  ];
+  // const activeCampaigns = [
+  //   {
+  //     id: "intuition-core-campaign",
+  //     title: "Intuition Core Experience",
+  //     description: "Explore the revolutionary trust and reputation system built for the decentralized future. Join thousands of early adopters.",
+  //     projectName: "Intuition",
+  //     participants: 3200,
+  //     // rewardPool: "100,000 tTRUST",
+  //     startDate: "Sep 19, 2024",
+  //     endDate: "Nov 19, 2024",
+  //     status: "Active",
+  //     category: "Platform Launch",
+  //     heroImage: campaignLaunchImg
+  //   },
+  //   {
+  //     id: "attestation-master-campaign", 
+  //     title: "Attestation Master Challenge",
+  //     description: "Master the art of creating meaningful attestations and build your reputation on Intuition.",
+  //     projectName: "Intuition",
+  //     participants: 1850,
+  //     // rewardPool: "50,000 tTRUST",
+  //     startDate: "Sep 25, 2024",
+  //     endDate: "Oct 25, 2024",
+  //     status: "Active",
+  //     category: "Skill Building",
+  //     heroImage: attestationMasteryImg
+  //   },
+  //   {
+  //     id: "trust-network-campaign",
+  //     title: "Trust Network Expansion",
+  //     description: "Help expand the trust network by creating quality attestations and building meaningful connections.",
+  //     projectName: "Intuition",
+  //     participants: 950,
+  //     // rewardPool: "25,000 tTRUST",
+  //     startDate: "Oct 5, 2024",
+  //     endDate: "Nov 5, 2024",
+  //     status: "Active",
+  //     category: "Network Growth",
+  //     heroImage: trustNetworkImg
+  //   }
+  // ];
 
   const upcomingCampaigns = [
     {
       id: "ecosystem-builder-campaign",
       title: "Ecosystem Builder Program",
       description: "Join the next phase of Intuition's ecosystem development. Help shape the future of decentralized trust.",
-      projectName: "Intuition",
+      nameOfProject: "Intuition",
       participants: 0,
       // rewardPool: "200,000 tTRUST",
       startDate: "Dec 1, 2024",
       endDate: "Feb 1, 2025",
       status: "Coming Soon",
       category: "Ecosystem",
-      heroImage: developerAdoptionImg
+      projectCoverImage: developerAdoptionImg
     }
   ];
+  
+  useEffect(() => {
+    (async () => {
+      const campaignsResponse = await apiRequest("GET", "/api/campaigns");
+      setActiveCampaigns(campaignsResponse.campaigns);
+      // setUpcomingCampaigns(campaignsResponse.scheduledCampaigns);
+    })();
+  }, []);
 
-  const renderCampaignCard = (campaign: any) => (
+// orion - show an empty box with message if there are no upcoming or active campaigns
+  const renderCampaignCard = (campaign: Campaign) => (
     <Card key={campaign.id} className="overflow-hidden hover-elevate group" data-testid={`campaign-${campaign.id}`}>
       {/* Hero Image */}
       <div className="relative h-48 overflow-hidden">
         <img 
-          src={campaign.heroImage} 
+          src={campaign.projectCoverImage}
           alt={campaign.title}
           className="w-full h-full object-cover transition-transform group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-        
+
         {/* Status Badge */}
         <div className="absolute top-4 right-4">
           <Badge 
@@ -109,7 +138,7 @@ export default function Campaigns() {
         <div className="space-y-3">
           <div className="flex justify-between items-center text-sm">
             <span className="text-muted-foreground">Project:</span>
-            <span className="font-medium">{campaign.projectName}</span>
+            <span className="font-medium">{campaign.nameOfProject}</span>
           </div>
           <div className="flex justify-between items-center text-sm">
             <span className="text-muted-foreground">Participants:</span>
