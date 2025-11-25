@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertReferralEventSchema, insertReferralClaimSchema } from "@shared/schema";
-import { DEBUG_SESSION_SECRET } from "./index";
+import { DEBUG_SESSION_SECRET } from "./constants";
 import crypto from "crypto";
 import { verifyMessage } from "ethers";
 import fs from "fs";

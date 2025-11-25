@@ -1,6 +1,6 @@
 import { defineConfig } from "drizzle-kit";
 
-import { DATABASE_URL } from "./server/index";
+import { DATABASE_URL } from "./server/constants";
 
 export default defineConfig({
   out: "./migrations",
