@@ -7,6 +7,7 @@ import { createProject } from "@/lib/remoteDb";
 import { ProjectSchema } from "@/schemas/project.schema";
 import { useWallet } from "@/hooks/use-wallet";
 import { uploadFile } from "@/lib/upload";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function ProjectCreate() {
   const { isConnected, connectWallet, address } = useWallet();
@@ -36,19 +37,16 @@ export default function ProjectCreate() {
         if (url) imageUrl = url;
       }
 
-      const payload = ProjectSchema.parse({
+      const payload = {
         name,
-        ownerAddress: address,
         description,
         website: website || undefined,
-        imageUrl,
-        createdAt: new Date().toISOString(),
-      });
+        logo: imageUrl,
+      };
 
-      const res: any = await createProject(payload);
-      // server returns created project with `id`
-      const created = Array.isArray(res) ? res[0] : res;
-      const id = created?.id || created?.projectId || created?.name;
+      const created = await apiRequest("POST", "/api", { payload });
+      const id = created.user.id;
+      localStorage.setItem("accessToken", created.accessToken)
       setSubmitting(false);
       setLocation(`/project/${id}/dashboard`);
     } catch (err: any) {
@@ -63,7 +61,7 @@ export default function ProjectCreate() {
         <h2 className="text-3xl font-bold text-white mb-3">Create Your Project</h2>
         <p className="text-white/60">Fill in the details below to launch your project on Nexura</p>
       </div>
-      
+
       <form onSubmit={handleSubmit} className="space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           <div className="lg:col-span-2 space-y-6">

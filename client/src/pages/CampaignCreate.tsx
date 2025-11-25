@@ -284,7 +284,7 @@ export default function CampaignCreate() {
       });
       return;
     }
-    
+
     if (tasks.length === 0) {
       toast({
         title: "Error",
@@ -298,20 +298,23 @@ export default function CampaignCreate() {
     
     try {
       // TODO: Get actual project ID from context/auth
-      const projectId = "temp-project-id";
+      // const projectId = "temp-project-id";
       
       // Create campaign
       const campaignData = {
-        projectId,
-        name: campaignName,
+        nameOfProject: "",
+        title: campaignName,
         description: campaignDescription,
-        startsAt: startDate ? new Date(startDate).toISOString() : null,
-        endsAt: endDate ? new Date(endDate).toISOString() : null,
+        startDate: startDate ? new Date(startDate).toISOString() : null,
+        endDate: endDate ? new Date(endDate).toISOString() : null,
       };
-      
-      // For now, we'll need a campaigns endpoint - let's log for now
-      console.log("Campaign data:", campaignData);
-      console.log("Tasks:", tasks);
+
+      const campaignSaved = await apiRequest("POST", "/api/campaign/create", { campaignData });
+      await apiRequest("POST", "/api/tasks", { tasks, campaignId: campaignSaved.id });
+
+      // // For now, we'll need a campaigns endpoint - let's log for now
+      // console.log("Campaign data:", campaignData);
+      // console.log("Tasks:", tasks);
       
       toast({
         title: "Success",
