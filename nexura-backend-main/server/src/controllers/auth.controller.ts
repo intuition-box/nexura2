@@ -72,7 +72,7 @@ export const signUp = async (req: GlobalRequest, res: GlobalResponse) => {
 			maxAge: 30 * 24 * 60 * 60,
 		});
 
-		res.status(CREATED).json({ message: "user created!", accessToken });
+		res.status(CREATED).json({ message: "user created!", accessToken, user: newUser });
 	} catch (error) {
 		logger.error(error);
 		res.status(INTERNAL_SERVER_ERROR).json({ error: "Error signing user up" });
