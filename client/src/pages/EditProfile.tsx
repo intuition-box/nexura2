@@ -8,6 +8,7 @@ import { ArrowLeft, Save } from "lucide-react";
 import { FaDiscord, FaTwitter } from "react-icons/fa";
 import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function EditProfile() {
   const [, setLocation] = useLocation();
@@ -21,17 +22,26 @@ export default function EditProfile() {
     }
   });
 
-const handleSave = () => {
-  localStorage.setItem("user_profile", JSON.stringify(profileData));
+  const handleSave = async () => {
+    const savedItem = localStorage.getItem("user_profile");
+    if (!savedItem) {
+      const saved = await apiRequest("POST", "", { username: profileData.displayName });
+      localStorage.setItem("user_profile", JSON.stringify(profileData));
+      localStorage.setItem("accessToken", saved.accessToken);
+      return
+    }
 
-  toast({
-    title: "Profile updated",
-    description: "Your profile has been successfully updated.",
-  });
+    localStorage.setItem("user_profile", JSON.stringify(profileData));
 
-  setLocation("/profile");
-};
+    await apiRequest("PUT", "/api/user/profile", { username: profileData.displayName });
 
+    toast({
+      title: "Profile updated",
+      description: "Your profile has been successfully updated.",
+    });
+
+    setLocation("/profile");
+  };
 
   const handleConnect = (service: "twitter" | "discord") => {
     // Redirect to actual social media connection sites
