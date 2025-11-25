@@ -764,10 +764,67 @@ class NeonStorage implements IStorage {
     this.pool = pool;
   }
 
-  // Session token helpers removed: this simplified build uses signature-based
-  // authentication (see /auth/simple) and does not create or manage bearer
-  // tokens in the database. If you need persistent session tokens, implement
-  // them explicitly in a separate branch or add-on.
+  // Session token helpers: implement DB-backed session tokens so production
+  // mode (NODE_ENV=production) can validate bearer tokens when NeonStorage
+  // is used. These mirror the in-memory MemStorage behavior but persist to
+  // the `user_session_tokens` table in Postgres (see server/migrations).
+
+  // Ensure the session token table exists (best-effort)
+  private async ensureSessionTokensTable() {
+    try {
+      await this.query(`
+        CREATE TABLE IF NOT EXISTS user_session_tokens (
+          token VARCHAR(128) PRIMARY KEY,
+          user_id VARCHAR(128),
+          address VARCHAR(255),
+          created_at TIMESTAMPTZ DEFAULT now(),
+          expires_at TIMESTAMPTZ
+        );
+      `);
+    } catch (e) {
+      // ignore - best-effort
+    }
+  }
+
+  // Create and persist a new session token
+  async createSessionToken(userId: string, address: string | null) {
+    await this.ensureSessionTokensTable();
+    const token = require("crypto").randomBytes(32).toString("hex");
+    try {
+      const r = await this.query(
+        `INSERT INTO user_session_tokens (token, user_id, address, created_at) VALUES ($1,$2,$3,now()) RETURNING token, created_at`,
+        [token, userId || null, address || null]
+      );
+      return r?.rows?.[0]?.token || token;
+    } catch (e) {
+      console.warn('[NeonStorage] createSessionToken failed', e);
+      return token;
+    }
+  }
+
+  // Lookup a session by token
+  async getSessionByToken(token: string) {
+    try {
+      await this.ensureSessionTokensTable();
+      const r = await this.query(`SELECT token, user_id, address, created_at FROM user_session_tokens WHERE token = $1 LIMIT 1`, [token]);
+      if (!r || !r.rows || r.rows.length === 0) return undefined;
+      const row = r.rows[0];
+      return { userId: row.user_id || null, address: row.address || null, createdAt: row.created_at };
+    } catch (e) {
+      console.warn('[NeonStorage] getSessionByToken failed', e);
+      return undefined;
+    }
+  }
+
+  // Delete a persisted session token
+  async deleteSessionToken(token: string) {
+    try {
+      await this.ensureSessionTokensTable();
+      await this.query(`DELETE FROM user_session_tokens WHERE token = $1`, [token]);
+    } catch (e) {
+      console.warn('[NeonStorage] deleteSessionToken failed', e);
+    }
+  }
 
   private async query(sql: string, params: any[] = []) {
     return this.pool.query(sql, params);

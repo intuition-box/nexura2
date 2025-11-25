@@ -50,14 +50,16 @@ app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
   try {
     const server = await registerRoutes(app);
 
-    // Seed tasks in development
-    if (app.get("env") === "development") {
+    // Seed tasks only when explicitly requested via SEED_ON_START.
+    // For production deployments we do NOT seed by default.
+    // To seed in a local/dev run set SEED_ON_START=true in your environment.
+    if (String(process.env.SEED_ON_START || '').toLowerCase() === 'true') {
       try {
         const { seedTasks } = await import("./seedTasks");
         await seedTasks();
-        log("✓ Tasks seeded successfully");
+        log("✔ Tasks seeded successfully");
       } catch (error) {
-        log("⚠ Failed to seed tasks: " + String(error));
+        log("✖ Failed to seed tasks: " + String(error));
       }
     }
 
