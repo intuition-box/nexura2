@@ -42,4 +42,12 @@ if (typeof window !== "undefined") {
 	});
 }
 
+// In development, inject a simple deterministic test wallet so the app can sign challenges
+// when running in minimal browsers (or the VS Code Simple Browser) that don't support
+// extensions or external wallets. This is only loaded in dev mode.
+if (import.meta.env.DEV) {
+	// dynamic import so production bundles don't include the dev helper
+	import("./dev/injectedWallet").catch((e) => console.warn("Failed to load dev injected wallet:", e));
+}
+
 createRoot(document.getElementById("root")!).render(<App />);

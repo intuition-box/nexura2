@@ -32,11 +32,23 @@ export async function setupVite(app: Express, server: Server) {
   const vite = await createViteServer({
     ...viteConfig,
     configFile: false,
+    // Use Vite's logger but do NOT forcefully exit the whole process on
+    // every Vite error. During development some plugins (e.g. PostCSS)
+    // may emit non-fatal warnings or recoverable errors; exiting causes
+    // the express server to shut down and makes the dev experience brittle.
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {
-        viteLogger.error(msg, options);
-        process.exit(1);
+        // Log the error via the vite logger. Do not call process.exit here
+        // so the express process keeps running and can recover.
+        try {
+          viteLogger.error(msg, options);
+        } catch (e) {
+          // Fallback to console if the logger fails for any reason.
+          // Don't terminate the process.
+          // eslint-disable-next-line no-console
+          console.error(msg);
+        }
       },
     },
     server: serverOptions,

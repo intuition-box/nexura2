@@ -264,6 +264,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Backwards-compatible simple auth endpoint used by some frontends
+  // This mirrors the /auth/wallet behavior so older clients that call
+  // /auth/simple will receive the same accessToken response.
+  app.post("/auth/simple", async (req, res) => {
+    try {
+      const { address, signature, message } = req.body || {};
+      if (!address || !signature || !message) return res.status(400).json({ error: "address, signature and message required" });
+      const stored = challenges.get(String(address).toLowerCase());
+      if (stored) {
+        if (stored.used) return res.status(400).json({ error: "challenge already used" });
+        if (stored.expiresAt < Date.now()) return res.status(400).json({ error: "challenge expired" });
+        if (stored.message !== message) return res.status(400).json({ error: "message mismatch" });
+      }
+      const recovered = verifyMessage(String(message), String(signature));
+      if (recovered.toLowerCase() !== String(address).toLowerCase()) {
+        return res.status(401).json({ error: "signature verification failed" });
+      }
+      if (stored) stored.used = true;
+
+      let token: string;
+      try {
+        if (storage && typeof (storage as any).createSessionToken === 'function') {
+          let userIdForToken: string | null = null;
+          try {
+            const maybeUser = await storage.getUserByAddress(String(address).toLowerCase());
+            if (maybeUser && (maybeUser as any).id) userIdForToken = (maybeUser as any).id;
+          } catch (err) { /* ignore */ }
+          token = await (storage as any).createSessionToken(userIdForToken || '', String(address).toLowerCase());
+        } else {
+          token = crypto.randomBytes(32).toString("hex");
+          sessions.set(token, { address: String(address).toLowerCase(), createdAt: Date.now() });
+        }
+      } catch (e) {
+        console.warn('failed to persist session token to storage, falling back to in-memory token', String(e));
+        token = crypto.randomBytes(32).toString("hex");
+        sessions.set(token, { address: String(address).toLowerCase(), createdAt: Date.now() });
+      }
+
+      try {
+        const addrLower = String(address).toLowerCase();
+        let user = await storage.getUserByAddress(addrLower);
+        if (!user) {
+          const randPwd = crypto.randomBytes(12).toString("hex");
+          user = await storage.createUser({ username: addrLower, password: randPwd, address: addrLower } as any);
+        }
+      } catch (e) {
+        console.warn("failed to ensure user record for address", e);
+      }
+
+      return res.json({ accessToken: token });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "verification failed" });
+    }
+  });
+
   // Verify signature and create a simple session token (returned to client)
   app.post("/auth/wallet", async (req, res) => {
     try {

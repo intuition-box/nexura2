@@ -1519,6 +1519,12 @@ if (NeonPool) {
   }
 } else {
   storageInstance = new MemStorage();
+  // Warn loudly when running in production without a DATABASE_URL. Using an
+  // in-memory session store in production will cause authentication tokens to
+  // be ephemeral and not shared across instances which results in 401s.
+  if ((process.env.NODE_ENV || '').toLowerCase() === 'production') {
+    console.warn('WARNING: Running in production mode WITHOUT DATABASE_URL. Sessions will NOT be persisted across instances. Set DATABASE_URL to use Neon/Postgres.');
+  }
 }
 
 export const storage = storageInstance;
