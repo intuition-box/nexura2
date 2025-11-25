@@ -1,7 +1,3 @@
-import * as dotenv from "dotenv";
-
-dotenv.config({ quiet: true });
-
 export const port = process.env.PORT || "5600";
 export const DB_URI = process.env.DB_URI as string;
 export const environment = process.env.ENVIRONMENT as "development" | "production";

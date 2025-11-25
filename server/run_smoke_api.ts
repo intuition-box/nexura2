@@ -1,13 +1,10 @@
-import dotenv from "dotenv";
 import path from "path";
 import express from "express";
 import { registerRoutes } from "./routes";
 
-// Hardcoded env vars from .env
 process.env.DATABASE_URL = "postgresql://neondb_owner:npg_g4BOXLHIw9uv@ep-super-dawn-ahjzzy2h-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
 process.env.DEBUG_SESSION_SECRET = "debug123";
-// Load local env if present
-dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+// dotenv removed: environment values are hardcoded above. Do NOT use dotenv in the codebase.
 
 const app = express();
 app.use(express.json());

@@ -7,10 +7,13 @@ let NeonPool: any = null;
 try {
   // lazy import so local dev without the env doesn't crash
   // @neondatabase/serverless provides a createPool compatible API
-  if (process.env.DATABASE_URL) {
-    const mod = await import("@neondatabase/serverless");
-    const createPool = (mod as any).createPool;
-    NeonPool = createPool(process.env.DATABASE_URL);
+  // Use CONFIG.DATABASE_URL instead of process.env
+  const mod = await import("./config");
+  const cfg = (mod as any).CONFIG || (mod as any).default;
+  if (cfg && cfg.DATABASE_URL) {
+    const mod2 = await import("@neondatabase/serverless");
+    const createPool = (mod2 as any).createPool;
+    NeonPool = createPool(cfg.DATABASE_URL);
   }
 } catch (e) {
   // ignore - dependency may not be available in some envs
