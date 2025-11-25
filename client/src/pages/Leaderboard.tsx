@@ -1,29 +1,58 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { apiRequest } from "@/lib/queryClient";
+import { useState, useEffect } from "react";
 
-const rankColors = {
+const rankColors: Record<number, string> = {
   1: "text-yellow-400",
   2: "text-gray-300",
   3: "text-amber-600",
 };
 
+interface Leaderboard {
+  leaderboardByXp: {
+    id: string;
+    username: string;
+    avatar: string;
+    xp: number;
+    trust: number;
+  }[];
+  leaderboardByTrust: {
+    id: string;
+    username: string;
+    avatar: string;
+    xp: number;
+    trust: number;
+  }[];
+}
+
 export default function Leaderboard() {
-  const leaderboardData = [
-    { id: 1, name: "Shebah", avatar: "https://i.pravatar.cc/40?img=1", xp: 820, tTrust: 12.4 },
-    { id: 2, name: "Liam", avatar: "https://i.pravatar.cc/40?img=4", xp: 640, tTrust: 4.2 },
-    { id: 3, name: "Promise", avatar: "https://i.pravatar.cc/40?img=2", xp: 500, tTrust: 9.1 },
-    { id: 4, name: "Daniel", avatar: "https://i.pravatar.cc/40?img=3", xp: 420, tTrust: 7.8 },
-    { id: 5, name: "Emma", avatar: "https://i.pravatar.cc/40?img=5", xp: 780, tTrust: 11.2 },
-    { id: 6, name: "Noah", avatar: "https://i.pravatar.cc/40?img=6", xp: 670, tTrust: 6.5 },
-    { id: 7, name: "Olivia", avatar: "https://i.pravatar.cc/40?img=7", xp: 590, tTrust: 8.3 },
-    { id: 8, name: "Ethan", avatar: "https://i.pravatar.cc/40?img=8", xp: 550, tTrust: 5.7 },
-    { id: 9, name: "Sophia", avatar: "https://i.pravatar.cc/40?img=9", xp: 510, tTrust: 7.1 },
-    { id: 10, name: "Mason", avatar: "https://i.pravatar.cc/40?img=10", xp: 480, tTrust: 4.9 },
-  ];
+  const [leaderboardData, setLeaderboardData] = useState<Leaderboard>({leaderboardByXp: [], leaderboardByTrust: []});
+  const storedData = localStorage.getItem("user_profile");
+  const userData = JSON.parse(storedData || "{}");
+  // const leaderboardData = [
+  //   { id: 1, name: "Shebah", avatar: "https://i.pravatar.cc/40?img=1", xp: 820, trust: 12.4 },
+  //   { id: 2, name: "Liam", avatar: "https://i.pravatar.cc/40?img=4", xp: 640, trust: 4.2 },
+  //   { id: 3, name: "Promise", avatar: "https://i.pravatar.cc/40?img=2", xp: 500, trust: 9.1 },
+  //   { id: 4, name: "Daniel", avatar: "https://i.pravatar.cc/40?img=3", xp: 420, trust: 7.8 },
+  //   { id: 5, name: "Emma", avatar: "https://i.pravatar.cc/40?img=5", xp: 780, trust: 11.2 },
+  //   { id: 6, name: "Noah", avatar: "https://i.pravatar.cc/40?img=6", xp: 670, trust: 6.5 },
+  //   { id: 7, name: "Olivia", avatar: "https://i.pravatar.cc/40?img=7", xp: 590, trust: 8.3 },
+  //   { id: 8, name: "Ethan", avatar: "https://i.pravatar.cc/40?img=8", xp: 550, trust: 5.7 },
+  //   { id: 9, name: "Sophia", avatar: "https://i.pravatar.cc/40?img=9", xp: 510, trust: 7.1 },
+  //   { id: 10, name: "Mason", avatar: "https://i.pravatar.cc/40?img=10", xp: 480, trust: 4.9 },
+  // ];
 
-  const userRank = { rank: 1, name: "Shebah", avatar: "https://i.pravatar.cc/40?img=1", xp: 820, tTrust: 12.4 };
+  useEffect(() => {
+    (async () => {
+      const leaderboardResponseData = await apiRequest("GET", "");
+      setLeaderboardData(leaderboardResponseData);
+    })();
+  }, []);
 
-  const displayData = [...leaderboardData];
-  displayData.splice(4, 0, { ...userRank, isCurrentUser: true });
+  // const userRank = { rank: 1, name: "Shebah", avatar: "https://i.pravatar.cc/40?img=1", xp: 820, trust: 12.4 };
+
+  const currentUser = leaderboardData.leaderboardByXp.find((data) => data.username === userData.displayName);
+  // displayData.splice(4, 0, { ...userRank, isCurrentUser: true });
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -34,12 +63,12 @@ export default function Leaderboard() {
           </CardHeader>
 
           <CardContent className="space-y-2">
-            {displayData.map((user, index) => {
+            {leaderboardData.leaderboardByXp.map((user, index) => {
               const rank = index + 1;
               const top3Style = rankColors[rank] || "text-gray-400";
 
               const highlight =
-                user.isCurrentUser ? "border-blue-400 bg-blue-400/10 shadow-sm" : "border-muted";
+                currentUser ? "border-blue-400 bg-blue-400/10 shadow-sm" : "border-muted";
 
               return (
                 <div
@@ -51,23 +80,21 @@ export default function Leaderboard() {
                     <span className={`w-8 text-sm font-bold ${top3Style}`}>#{rank}</span>
 
                     <img
-                      src={user.avatar}
-                      alt={user.name}
-                      className={`w-10 h-10 rounded-full border ${
-                        user.isCurrentUser ? "border-blue-400" : "border-gray-300"
-                      }`}
+                      src={user.avatar ?? "https://i.pravatar.cc/40?img=1"}
+                      alt={user.username}
+                      className={`w-10 h-10 rounded-full border ${currentUser ? "border-blue-400" : "border-gray-300"
+                        }`}
                     />
 
                     <div className="flex flex-col">
                       <span
-                        className={`font-medium text-sm ${
-                          user.isCurrentUser ? "text-blue-600" : "text-foreground"
-                        }`}
+                        className={`font-medium text-sm ${currentUser ? "text-blue-600" : "text-foreground"
+                          }`}
                       >
-                        {user.name}
+                        {user.username}
                       </span>
 
-                      {user.isCurrentUser && (
+                      {currentUser && (
                         <span className="text-xs text-blue-500">Your Position</span>
                       )}
                     </div>
@@ -81,8 +108,8 @@ export default function Leaderboard() {
                     </div>
 
                     <div className="flex flex-col items-end">
-                      <span className="font-semibold">{user.tTrust}</span>
-                      <span className="text-[10px] text-muted-foreground">tTRUST</span>
+                      <span className="font-semibold">{user.trust}</span>
+                      <span className="text-[10px] text-muted-foreground">TRUST</span>
                     </div>
                   </div>
                 </div>
