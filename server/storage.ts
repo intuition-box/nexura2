@@ -108,10 +108,18 @@ export class MemStorage implements IStorage {
     this.campaignTaskCompletions = new Map();
     this.sessionTokens = new Map();
     this.quests = new Map();
-    
-    // Seed test data
-    this.seedTestData();
-    this.seedQuests();
+
+    // Seed test data only when explicitly enabled via SEED_ON_START
+    // In production we should not auto-seed the in-memory storage.
+    if (String(process.env.SEED_ON_START || '').toLowerCase() === 'true') {
+      // Seed test data (development convenience)
+      try {
+        this.seedTestData();
+        this.seedQuests();
+      } catch (e) {
+        console.warn('failed to seed MemStorage test data', e);
+      }
+    }
 
     // attempt to load persisted data from disk
     try {
