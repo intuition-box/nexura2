@@ -401,6 +401,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   async function getSessionFromReq(req: any) {
     try {
       const auth = String(req.headers.authorization || "").trim();
+      // DEBUG: log presence of Authorization header if DEBUG_SESSION_SECRET is set
+      try {
+        const debugSecret = process.env.DEBUG_SESSION_SECRET;
+        if (debugSecret) {
+          const hasAuth = !!auth;
+          const redacted = auth && auth.split(/\s+/)[1] ? ((auth.split(/\s+/)[1] as string).slice(0,4) + '...' + (auth.split(/\s+/)[1] as string).slice(-4)) : null;
+          console.log('getSessionFromReq debug:', { hasAuth, redacted });
+        }
+      } catch (logErr) {
+        // ignore logging errors
+      }
       if (!auth || !auth.toLowerCase().startsWith('bearer ')) return null;
       const token = auth.split(/\s+/)[1];
       if (!token) return null;
@@ -408,6 +419,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (storage && typeof (storage as any).getSessionByToken === 'function') {
         try {
           const dbSess = await (storage as any).getSessionByToken(token);
+          // DEBUG: log if DB session found
+          try {
+            const debugSecret = process.env.DEBUG_SESSION_SECRET;
+            if (debugSecret) {
+              console.log('getSessionFromReq debug: dbSess found?', !!dbSess);
+            }
+          } catch (e) {}
           if (dbSess) {
             const sessionObj: any = { createdAt: dbSess.createdAt || Date.now() };
             if (dbSess.userId) sessionObj.userId = dbSess.userId;
