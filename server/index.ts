@@ -1,11 +1,12 @@
-import dotenv from "dotenv";
+ 
 import { createRequire } from 'module';
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 
 const DATABASE_URL = "postgresql://neondb_owner:npg_g4BOXLHIw9uv@ep-super-dawn-ahjzzy2h-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
 const DEBUG_SESSION_SECRET = "debug123";
-try { dotenv.config({ path: path.resolve(process.cwd(), ".env") }); } catch {}
+
+export { DATABASE_URL, DEBUG_SESSION_SECRET };
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
