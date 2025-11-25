@@ -26,8 +26,8 @@ export default function Signal() {
           </CardHeader>
           <CardContent className="text-center">
             <p className="text-muted-foreground mb-4">
-              We're developing comprehensive analytics and insights tools to help you track ecosystem growth, 
-              quest completion rates, and tTRUST token metrics across the Intuition testnet.
+              We're developing comprehensive analytics and insights tools to help you track ecosystem growth,
+              quest completion rates, and TRUST token metrics across the Intuition testnet.
             </p>
             <div className="text-sm text-muted-foreground">
               Coming soon: Real-time analytics, trend analysis, and ecosystem insights

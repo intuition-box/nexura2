@@ -13,7 +13,7 @@ const userAnalytics = {
   level: 8,
   badges: 3,
   questsCompleted: 12,
-  tTrustEarned: 6.0
+  trustEarned: 6.0
 };
 
 // Updated level achievements with new titles (Level 1–10)
@@ -31,16 +31,16 @@ const levelAchievementsInitial = [
 ];
 
 export default function Profile() {
-const [userData] = useState(() => {
-  const saved = localStorage.getItem("user_profile");
-  return saved
-    ? JSON.parse(saved)
-    : {
+  const [userData] = useState(() => {
+    const saved = localStorage.getItem("user_profile");
+    return saved
+      ? JSON.parse(saved)
+      : {
         username: "0xD524...9779",
         displayName: "0xD524...9779",
         joinedDate: "Nov 2024",
       };
-});
+  });
 
 
   const [userXp, setUserXp] = useState(100);
@@ -110,7 +110,7 @@ const [userData] = useState(() => {
             <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Level</p><p className="text-2xl font-bold">{userAnalytics.level}</p></CardContent></Card>
             <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Badges</p><p className="text-2xl font-bold">{userAnalytics.badges}</p></CardContent></Card>
             <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">Quests Completed</p><p className="text-2xl font-bold">{userAnalytics.questsCompleted}</p></CardContent></Card>
-            <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">tTRUST Earned</p><p className="text-2xl font-bold">{userAnalytics.tTrustEarned}</p></CardContent></Card>
+            <Card><CardContent className="p-6"><p className="text-sm text-muted-foreground">TRUST Earned</p><p className="text-2xl font-bold">{userAnalytics.trustEarned}</p></CardContent></Card>
           </div>
         </section>
 

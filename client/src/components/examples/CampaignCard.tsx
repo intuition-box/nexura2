@@ -26,7 +26,7 @@ export default function CampaignCardExample() {
         isLive={true}
         rewardPool={{
           amount: "60,000",
-          token: "tTRUST"
+          token: "TRUST"
         }}
       />
       <CampaignCard

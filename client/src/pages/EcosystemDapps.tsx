@@ -49,7 +49,7 @@ export default function EcosystemDapps() {
       description: "Stake and make claims. Buy into claims bonding curves to support or negate a claim",
       category: "Portal",
       logo: intuitionPortalLogo,
-      questReward: "100 XP + 3.0 tTRUST",
+      questReward: "100 XP + 3.0 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -61,7 +61,7 @@ export default function EcosystemDapps() {
       description: "A decentralized lending protocol and DEX for borrowing and swaping tokens on Intuition Testnet",
       category: "Lending Protocols",
       logo: oracleLendLogo,
-      questReward: "85 XP + 2.8 tTRUST",
+      questReward: "85 XP + 2.8 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -73,7 +73,7 @@ export default function EcosystemDapps() {
       description: "Swap and stake $INTUIT token seamlessly",
       category: "DeFi",
       logo: intudexLogo,
-      questReward: "75 XP + 2.5 tTRUST",
+      questReward: "75 XP + 2.5 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -85,7 +85,7 @@ export default function EcosystemDapps() {
       description: "A decentralized lending protocol and DEX for borrowing and swaping tokens on Intuition Testnet",
       category: "DeFi",
       logo: oracleLendLogo,
-      questReward: "85 XP + 2.8 tTRUST",
+      questReward: "85 XP + 2.8 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -97,7 +97,7 @@ export default function EcosystemDapps() {
       description: "Fair dice game on blockchain",
       category: "Gaming",
       logo: diceGameLogo,
-      questReward: "50 XP + 1.5 tTRUST",
+      questReward: "50 XP + 1.5 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -109,7 +109,7 @@ export default function EcosystemDapps() {
       description: "Decentralized, human-readable names for your crypto addresses on Intuition blockchain",
       category: "Domain Name",
       logo: tnsLogo,
-      questReward: "65 XP + 2.0 tTRUST",
+      questReward: "65 XP + 2.0 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -122,7 +122,7 @@ export default function EcosystemDapps() {
       description: "Swap and stake stake different tokens seamlessly",
       category: "DeFi",
       logo: trustSwapLogo,
-      questReward: "70 XP + 2.2 tTRUST",
+      questReward: "70 XP + 2.2 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -134,7 +134,7 @@ export default function EcosystemDapps() {
       description: "A secure, decentralized escrow platform built on TRUST",
       category: "DeFi",
       logo: trustEscrowLogo,
-      questReward: "70 XP + 2.2 tTRUST",
+      questReward: "70 XP + 2.2 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -146,7 +146,7 @@ export default function EcosystemDapps() {
       description: "Discover, create and mint NFTs",
       category: "NFT",
       logo: memkopadLogo,
-      questReward: "60 XP + 1.8 tTRUST",
+      questReward: "60 XP + 1.8 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -158,7 +158,7 @@ export default function EcosystemDapps() {
       description: "Defeat the eyes of the institution. An eerie, sci-fi shmup",
       category: "Gaming",
       logo: gazeBreakerLogo,
-      questReward: "80 XP + 2.5 tTRUST",
+      questReward: "80 XP + 2.5 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -170,7 +170,7 @@ export default function EcosystemDapps() {
       description: "Play prediction games and minigames to earn INTUIT tokens on the Intuition Network",
       category: "Gaming",
       logo: intuitParkLogo,
-      questReward: "90 XP + 2.8 tTRUST",
+      questReward: "90 XP + 2.8 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -182,7 +182,7 @@ export default function EcosystemDapps() {
       description: "Join tiles to reach 2048!",
       category: "Gaming",
       logo: twentyFortyEightLogo,
-      questReward: "45 XP + 1.2 tTRUST",
+      questReward: "45 XP + 1.2 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -194,7 +194,7 @@ export default function EcosystemDapps() {
       description: "Play Tetris, earn TRUST!",
       category: "Gaming",
       logo: tetrisLogo,
-      questReward: "55 XP + 1.5 tTRUST",
+      questReward: "55 XP + 1.5 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -206,7 +206,7 @@ export default function EcosystemDapps() {
       description: "Launch Your Meme Token: Fair launch meme tokens with bonding curves on Intuition Testnet",
       category: "Launchpads",
       logo: intuitionMemeLogo,
-      questReward: "90 XP + 2.8 tTRUST",
+      questReward: "90 XP + 2.8 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -218,7 +218,7 @@ export default function EcosystemDapps() {
       description: "Place your bets and test your intuition",
       category: "Prediction Markets",
       logo: intuitionBetsLogo,
-      questReward: "80 XP + 2.5 tTRUST",
+      questReward: "80 XP + 2.5 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -230,7 +230,7 @@ export default function EcosystemDapps() {
       description: "Discover Your On-Chain Prophecy",
       category: "Social",
       logo: intuitionOracleLogo,
-      questReward: "70 XP + 2.2 tTRUST",
+      questReward: "70 XP + 2.2 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -242,7 +242,7 @@ export default function EcosystemDapps() {
       description: "pray",
       category: "Social",
       logo: intuitionTempleLogo,
-      questReward: "60 XP + 1.8 tTRUST",
+      questReward: "60 XP + 1.8 TRUST",
       estimatedTime: "15 min",
       isCompleted: false,
       isClaimed: false,
@@ -303,8 +303,8 @@ export default function EcosystemDapps() {
   const categories = ["All", "Portal", "DeFi", "NFT", "Gaming", "Domain Name", "Social", "Launchpads", "Lending Protocols", "Prediction Markets"];
   const [selectedCategory, setSelectedCategory] = useState("All");
 
-  const filteredDapps = selectedCategory === "All" 
-    ? dapps 
+  const filteredDapps = selectedCategory === "All"
+    ? dapps
     : dapps.filter(dapp => dapp.category === selectedCategory);
 
   return (
@@ -336,8 +336,8 @@ export default function EcosystemDapps() {
         {/* Dapps Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
           {filteredDapps.map((dapp) => (
-            <Card 
-              key={dapp.id} 
+            <Card
+              key={dapp.id}
               className="cursor-pointer hover-elevate active-elevate-2 transition-all duration-200 relative flex flex-col min-h-[300px]"
               onClick={() => handleCardClick(dapp)}
               data-testid={`dapp-card-${dapp.id}`}
@@ -349,7 +349,7 @@ export default function EcosystemDapps() {
                   </div>
                 </div>
               )}
-              
+
               <CardHeader className="pb-3">
                 <div className="flex items-center space-x-3">
                   <div className="w-12 h-12 flex items-center justify-center">
@@ -367,26 +367,26 @@ export default function EcosystemDapps() {
                   </div>
                 </div>
               </CardHeader>
-              
+
               <CardContent className="flex flex-col h-full">
                 <div className="flex-1 mb-4">
                   <p className="text-sm text-muted-foreground">{dapp.description}</p>
                 </div>
-                
+
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Est. Time:</span>
                     <span className="text-xs font-medium">{dapp.estimatedTime}</span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Reward:</span>
                     <span className="text-xs font-bold text-primary">{dapp.questReward}</span>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-2 mt-auto">
-                  <Button 
+                  <Button
                     className="flex-1"
                     variant="outline"
                     onClick={(e) => handleExploreClick(dapp, e)}
@@ -395,9 +395,9 @@ export default function EcosystemDapps() {
                     <ExternalLink className="w-4 h-4 mr-2" />
                     Explore
                   </Button>
-                  
+
                   {!claimedDapps.has(dapp.id) && (
-                    <Button 
+                    <Button
                       className="flex-1"
                       variant="quest"
                       onClick={(e) => handleClaimClick(dapp, e)}

@@ -8,7 +8,7 @@ import { Gift, TrendingUp, Zap } from "lucide-react";
 export default function Rewards() {
   const [userEarnings] = useState({
     staking: "0",
-    incentives: "0", 
+    incentives: "0",
     campaigns: "0",
     liquid: "0"
   });
@@ -43,7 +43,7 @@ export default function Rewards() {
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Your earnings on NEXURA</h1>
-          <div className="text-2xl font-bold text-foreground">0 tTRUST</div>
+          <div className="text-2xl font-bold text-foreground">0 TRUST</div>
         </div>
 
         {/* Earnings Overview */}
@@ -53,16 +53,16 @@ export default function Rewards() {
               <CardTitle className="text-sm font-medium text-muted-foreground">QF Incentives</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{userEarnings.incentives} tTRUST</div>
+              <div className="text-2xl font-bold">{userEarnings.incentives} TRUST</div>
             </CardContent>
           </Card>
-          
+
           <Card data-testid="card-campaigns">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">Campaigns</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{userEarnings.campaigns} tTRUST</div>
+              <div className="text-2xl font-bold">{userEarnings.campaigns} TRUST</div>
             </CardContent>
           </Card>
 
@@ -71,7 +71,7 @@ export default function Rewards() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Quest Earnings</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{userEarnings.liquid} tTRUST</div>
+              <div className="text-2xl font-bold">{userEarnings.liquid} TRUST</div>
             </CardContent>
           </Card>
         </div>
@@ -80,20 +80,19 @@ export default function Rewards() {
         <Card className="p-6" data-testid="quest-earnings-section">
           <h2 className="text-2xl font-bold text-foreground mb-4">Quest Earnings</h2>
           <p className="text-muted-foreground mb-6">
-            With each quest you complete, you earn tTRUST
+            With each quest you complete, you earn TRUST
           </p>
 
           {/* Reward Rate Tiers */}
           <div className="space-y-3 mb-6">
             <div className="text-sm font-medium text-muted-foreground mb-3">Quest Earning Rate</div>
             {rewardTiers.map((tier, index) => (
-              <div 
-                key={index} 
-                className={`flex items-center justify-between p-3 rounded-lg border ${
-                  userStats.liquidRewardRate === tier.rate 
-                    ? 'bg-primary/10 border-primary' 
+              <div
+                key={index}
+                className={`flex items-center justify-between p-3 rounded-lg border ${userStats.liquidRewardRate === tier.rate
+                    ? 'bg-primary/10 border-primary'
                     : 'bg-muted/20 border-border'
-                }`}
+                  }`}
                 data-testid={`reward-tier-${tier.rate}`}
               >
                 <div className="flex items-center space-x-3">
@@ -113,7 +112,7 @@ export default function Rewards() {
           <div className="text-center">
             <h3 className="text-xl font-bold text-foreground mb-2">Season 1 Active</h3>
             <p className="text-muted-foreground mb-4">
-              Complete quests and earn tTRUST rewards. Your progress is tracked automatically.
+              Complete quests and earn TRUST rewards. Your progress is tracked automatically.
             </p>
             <div className="flex justify-center items-center space-x-4 mb-4">
               <div className="text-3xl font-bold">0</div>
@@ -146,8 +145,8 @@ export default function Rewards() {
                   <span className="text-muted-foreground">Next Tier</span>
                   <span>47 / 50 quests</span>
                 </div>
-                <Progress 
-                  value={(47 / 50) * 100} 
+                <Progress
+                  value={(47 / 50) * 100}
                   className="h-2"
                 />
               </div>
@@ -160,7 +159,7 @@ export default function Rewards() {
           <div className="flex justify-between items-start mb-6">
             <div>
               <h3 className="text-lg font-bold text-foreground">Your Quest Earnings</h3>
-              <div className="text-2xl font-bold mt-2">0 tTRUST</div>
+              <div className="text-2xl font-bold mt-2">0 TRUST</div>
             </div>
             <div className="text-right">
               <div className="text-sm text-muted-foreground">Quest Earning Rate</div>

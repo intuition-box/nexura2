@@ -3,52 +3,52 @@ import { z } from "zod";
 import { JWT_SECRET, REFRESH_SECRET } from "./env.utils";
 
 export const validateCampaignData = (reqData: any) => {
-  const campaignSchema = z.object({
-    title: z.string().trim(),
-    description: z.string().trim(),
-    nameOfProject: z.string().trim(),
-    startDate: z.string().trim(),
-    endDate: z.string().trim(),
-    reward: z.object({
-      xp: z.number(),
-      tTrust: z.number()
-    }),
-    totaltTrustAvailable: z.number(),
-    contractAddress: z.string().optional()
-  });
+	const campaignSchema = z.object({
+		title: z.string().trim(),
+		description: z.string().trim(),
+		nameOfProject: z.string().trim(),
+		startDate: z.string().trim(),
+		endDate: z.string().trim(),
+		reward: z.object({
+			xp: z.number(),
+			// trust: z.number(),
+		}),
+		// totaltrustAvailable: z.number(),
+		contractAddress: z.string().optional(),
+	});
 
-  const parseData = campaignSchema.safeParse(reqData);
+	const parseData = campaignSchema.safeParse(reqData);
 
-  return parseData;
+	return parseData;
 };
 
 export const validateQuestData = (reqData: any) => {
-  const questSchema = z.object({
-    title: z.string().trim(),
-    description: z.string().trim(),
-    category: z.enum(["one-time", "daily"]),
-    reward: z.object({
-      xp: z.number(),
-      tTrust: z.number()
-    })
-  });
+	const questSchema = z.object({
+		title: z.string().trim(),
+		description: z.string().trim(),
+		category: z.enum(["one-time", "daily"]),
+		reward: z.object({
+			xp: z.number(),
+			trust: z.number(),
+		}),
+	});
 
-  const parseData = questSchema.safeParse(reqData);
+	const parseData = questSchema.safeParse(reqData);
 
-  return parseData;
+	return parseData;
 };
 
 export const validateTaskData = (reqData: any) => {
-  const taskSchema = z.object({
-    task: z.string().trim(),
-    link: z.string().trim().optional(),
-    campaign: z.string().trim(),
-    xp: z.number(),
-  });
+	const taskSchema = z.object({
+		task: z.string().trim(),
+		link: z.string().trim().optional(),
+		campaign: z.string().trim(),
+		xp: z.number(),
+	});
 
-  const parseData = taskSchema.safeParse(reqData);
+	const parseData = taskSchema.safeParse(reqData);
 
-  return parseData;
+	return parseData;
 };
 
 export const validateEcosystemTaskData = (reqData: any) => {
@@ -70,7 +70,7 @@ export const validateEcosystemTaskData = (reqData: any) => {
 		]),
 		rewards: z.object({
 			xp: z.number(),
-			tTrust: z.number(),
+			trust: z.number(),
 		}),
 	});
 
@@ -80,25 +80,25 @@ export const validateEcosystemTaskData = (reqData: any) => {
 };
 
 export const validateProjectData = (reqData: any) => {
-  const projectSchema = z.object({
-    name: z.string().trim(),
-    email: z.email().trim(),
-    logo: z.string().trim(),
-  });
+	const projectSchema = z.object({
+		name: z.string().trim(),
+		email: z.email().trim(),
+		logo: z.string().trim(),
+	});
 
-  const parseData = projectSchema.safeParse(reqData);
+	const parseData = projectSchema.safeParse(reqData);
 
-  return parseData;
-}
+	return parseData;
+};
 
 export const JWT = {
-  sign: (data: any) => {
-    return jwt.sign(data, JWT_SECRET, { expiresIn: "1d" });
-  },
+	sign: (data: any) => {
+		return jwt.sign(data, JWT_SECRET, { expiresIn: "1d" });
+	},
 
-  verify: (jwtToken: string) => {
-    return new Promise((resolve, reject) => {
-      jwt.verify(jwtToken, JWT_SECRET, (error, decodedText) => {
+	verify: (jwtToken: string) => {
+		return new Promise((resolve, reject) => {
+			jwt.verify(jwtToken, JWT_SECRET, (error, decodedText) => {
 				if (error) reject(error.message);
 				else if (typeof decodedText === "object") {
 					resolve(decodedText);
@@ -106,10 +106,10 @@ export const JWT = {
 					reject("Invalid JWT payload");
 				}
 			});
-    })
-  }
-}
+		});
+	},
+};
 
 export const getRefreshToken = (id: any) => {
-  return jwt.sign({ id }, REFRESH_SECRET, { expiresIn: "30d" });
-}
+	return jwt.sign({ id }, REFRESH_SECRET, { expiresIn: "30d" });
+};

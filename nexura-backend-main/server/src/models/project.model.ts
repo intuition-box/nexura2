@@ -7,11 +7,17 @@ const projectSchema = new Schema({
   },
   email: {
     type: String,
-    required: true
+    // required: true
   },
   logo: {
     type: String,
     required: true
+  },
+  description: {
+    type: String,
+  },
+  website: {
+    type: String,
   },
   campaignsCreated: {
     type: Number,

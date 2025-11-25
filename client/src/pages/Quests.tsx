@@ -87,7 +87,7 @@ export default function Quests() {
     (async () => {
       const questsResponse = await apiRequest("GET", "/api/quests");
       setOneTimeQuests(questsResponse.oneTimeQuests);
-      setActiveQuestTasks(questsResponse.activeQuestTasks);
+      setActiveQuestTasks(questsResponse.activeQuests);
     })();
   }, []);
 
@@ -103,13 +103,13 @@ export default function Quests() {
     <Card key={quest.id} className="overflow-hidden hover-elevate group" data-testid={`quest-${quest.id}`}>
       {/* Hero Image */}
       <div className="relative h-48 overflow-hidden">
-        <img 
-          src={quest.heroImage} 
+        <img
+          src={quest.heroImage}
           alt={quest.title}
           className="w-full h-full object-cover transition-transform group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-        
+
         {/* Completion Status */}
         <div className="absolute top-4 right-4">
           {quest.completed ? (
@@ -119,13 +119,13 @@ export default function Quests() {
           )}
         </div>
       </div>
-      
+
       <CardHeader className="pb-3">
         <CardTitle className="text-lg font-semibold">{quest.title}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-muted-foreground text-sm">{quest.description}</p>
-        
+
         {showProgress && quest.progress !== undefined && (
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
@@ -133,7 +133,7 @@ export default function Quests() {
               <span>{quest.progress} / {quest.total}</span>
             </div>
             <div className="w-full bg-muted rounded-full h-2">
-              <div 
+              <div
                 className="bg-primary rounded-full h-2 transition-all"
                 style={{ width: `${(quest.progress / quest.total) * 100}%` }}
               />
@@ -163,8 +163,8 @@ export default function Quests() {
           </div>
         </div>
 
-        <Button 
-          className="w-full" 
+        <Button
+          className="w-full"
           variant={quest.completed ? "outline" : "quest"}
           disabled={quest.completed}
           onClick={() => !quest.completed && setLocation(`/quest/${quest.id}?from=quests`)}
@@ -208,18 +208,17 @@ export default function Quests() {
                 Complete these tasks weekly to earn XP • Resets every 7 days
               </p>
             </div>
-            
+
             {/* Active Tasks List */}
             <div className="space-y-4">
               {activeQuestTasks.map((task: { id: string; title: string; description: string; reward: Record<string, number>; done: boolean; }) => (
                 <Card key={task.id} className="p-6" data-testid={`active-task-${task.id}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                        task.done 
-                          ? 'bg-green-500 border-green-500' 
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${task.done
+                          ? 'bg-green-500 border-green-500'
                           : 'border-gray-300'
-                      }`}>
+                        }`}>
                         {task.done && (
                           <CheckCircle className="w-4 h-4 text-white" />
                         )}
@@ -229,12 +228,12 @@ export default function Quests() {
                         <p className="text-sm text-muted-foreground">{task.description}</p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
                         <div className="font-semibold text-primary">{task.reward.xp + " XP" + " + " + task.reward.trust + " trust"}</div>
                       </div>
-                      <Button 
+                      <Button
                         size="sm"
                         variant={task.done ? "outline" : "quest"}
                         disabled={task.done}
@@ -248,7 +247,7 @@ export default function Quests() {
                 </Card>
               ))}
             </div>
-            
+
             {/* Active Progress Summary */}
             <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5">
               <div className="flex items-center justify-between">
@@ -283,11 +282,10 @@ export default function Quests() {
                 <Card key={quest.id} className="p-6" data-testid={`onetime-task-${quest.id}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                        quest.done 
-                          ? 'bg-green-500 border-green-500' 
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${quest.done
+                          ? 'bg-green-500 border-green-500'
                           : 'border-gray-300'
-                      }`}>
+                        }`}>
                         {quest.done && (
                           <CheckCircle className="w-4 h-4 text-white" />
                         )}
@@ -297,12 +295,12 @@ export default function Quests() {
                         <p className="text-sm text-muted-foreground">{quest.description}</p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
-                        <div className="font-semibold text-primary">{quest.reward.xp + " XP" + " + " + quest.reward.tTrust + " trust"}</div>
+                        <div className="font-semibold text-primary">{quest.reward.xp + " XP" + " + " + quest.reward.trust + " trust"}</div>
                       </div>
-                      <Button 
+                      <Button
                         size="sm"
                         variant={quest.done ? "outline" : "quest"}
                         disabled={quest.done}
@@ -316,7 +314,7 @@ export default function Quests() {
                 </Card>
               ))}
             </div>
-            
+
             {/* One Time Quests Progress Summary */}
             <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5">
               <div className="flex items-center justify-between">

@@ -5,6 +5,11 @@ const questCompletedSchema = new Schema({
     type: Boolean,
     required: true
   },
+  category: {
+    type: String,
+    default: "weekly",
+    enum: ["weekly", "one-time"]
+  },
   quest: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "quests"

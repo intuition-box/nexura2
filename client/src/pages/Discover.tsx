@@ -46,7 +46,7 @@ export default function Discover() {
     const initializeRefreshTimer = () => {
       const lastRefresh = localStorage.getItem('lastTaskRefresh');
       const now = Date.now();
-      
+
       if (!lastRefresh) {
         // First time - set the refresh time to now
         localStorage.setItem('lastTaskRefresh', now.toString());
@@ -99,7 +99,7 @@ export default function Discover() {
       isLive: true,
       rewardPool: {
         amount: "50,000",
-        token: "tTRUST"
+        token: "TRUST"
       },
       heroImage: trustNetworkImg
     }
@@ -114,7 +114,7 @@ export default function Discover() {
       projectLogo: questHero1, // Using quest hero as project logo
       heroImage: gettingStartedImg,
       participants: 2400,
-      rewards: "500 tTRUST",
+      rewards: "500 TRUST",
       tags: ["New"],
       questId: "getting-started-intuition"
     },
@@ -125,7 +125,7 @@ export default function Discover() {
       projectLogo: questHero1, // Using quest hero as project logo
       heroImage: identityCreationImg,
       participants: 1800,
-      rewards: "300 tTRUST",
+      rewards: "300 TRUST",
       questId: "creating-first-identity"
     },
     {
@@ -135,7 +135,7 @@ export default function Discover() {
       projectLogo: questHero1, // Using quest hero as project logo
       heroImage: attestationMasteryImg,
       participants: 1500,
-      rewards: "750 tTRUST",
+      rewards: "750 TRUST",
       questId: "attestation-mastery"
     }
   ];
@@ -152,7 +152,7 @@ export default function Discover() {
       isLive: true,
       rewardPool: {
         amount: "100,000",
-        token: "tTRUST"
+        token: "TRUST"
       },
       campaignId: "intuition-testnet-launch"
     },
@@ -167,7 +167,7 @@ export default function Discover() {
       isLive: true,
       rewardPool: {
         amount: "75,000",
-        token: "tTRUST"
+        token: "TRUST"
       },
       campaignId: "developer-adoption-sprint"
     }
@@ -189,17 +189,17 @@ export default function Discover() {
       content: "Intuition's reputation system will revolutionize how we build trust in Web3. The attestation mechanism creates verifiable credentials that span across multiple protocols.",
       timeAgo: "2 hours ago",
       attestations: 47,
-      tTrustEarned: "12.5",
+      trustEarned: "12.5",
       category: "Tech Innovation",
       categoryColor: "bg-blue-500"
     },
     {
-      author: "DeFiAnalyst", 
+      author: "DeFiAnalyst",
       avatar: avatar2,
       content: "The integration between Intuition and major DeFi protocols is creating new opportunities for reputation-based lending and yield farming strategies.",
       timeAgo: "4 hours ago",
       attestations: 32,
-      tTrustEarned: "8.2",
+      trustEarned: "8.2",
       category: "DeFi Analysis",
       categoryColor: "bg-green-500"
     },
@@ -209,7 +209,7 @@ export default function Discover() {
       content: "Building on Intuition's infrastructure has been game-changing for our dApp. The trust score integration reduced user onboarding friction by 60%.",
       timeAgo: "6 hours ago",
       attestations: 28,
-      tTrustEarned: "15.7",
+      trustEarned: "15.7",
       category: "Developer Experience",
       categoryColor: "bg-purple-500"
     },
@@ -219,7 +219,7 @@ export default function Discover() {
       content: "Intuition's approach to decentralized identity verification addresses critical gaps in current Web3 infrastructure. This could be the missing piece for mainstream adoption.",
       timeAgo: "8 hours ago",
       attestations: 56,
-      tTrustEarned: "22.1",
+      trustEarned: "22.1",
       category: "Research Insights",
       categoryColor: "bg-orange-500"
     },
@@ -229,7 +229,7 @@ export default function Discover() {
       content: "The NEXURA platform integration with Intuition creates a seamless experience for both quest completion and reputation building. Great UX design!",
       timeAgo: "10 hours ago",
       attestations: 19,
-      tTrustEarned: "6.8",
+      trustEarned: "6.8",
       category: "User Experience",
       categoryColor: "bg-pink-500"
     },
@@ -239,7 +239,7 @@ export default function Discover() {
       content: "Seeing real-world applications of Intuition's trust protocols in various ecosystems. The network effects are starting to compound beautifully.",
       timeAgo: "12 hours ago",
       attestations: 41,
-      tTrustEarned: "18.3",
+      trustEarned: "18.3",
       category: "Network Effects",
       categoryColor: "bg-cyan-500"
     }
@@ -261,7 +261,7 @@ export default function Discover() {
             />
           </div>
         </div>
-        
+
         <div className="flex items-center space-x-4">
         </div>
       </div>
@@ -282,9 +282,9 @@ export default function Discover() {
             <section>
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-foreground">Trending Campaigns</h2>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setLocation('/campaigns')}
                   data-testid="button-show-all-trending-campaigns"
                 >
@@ -304,9 +304,9 @@ export default function Discover() {
             <section>
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-foreground">Trending Dapps</h2>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setLocation('/ecosystem-dapps')}
                   data-testid="button-show-all-trending-dapps"
                 >
@@ -315,8 +315,8 @@ export default function Discover() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {trendingDapps.map((dapp, index) => (
-                  <div 
-                    key={`dapp-${index}`} 
+                  <div
+                    key={`dapp-${index}`}
                     className="group flex flex-col items-center p-4 rounded-lg bg-card hover:bg-card/80 border border-card-border hover-elevate transition-colors cursor-pointer"
                     onClick={() => setLocation('/ecosystem-dapps')}
                     data-testid={`trending-dapp-${dapp.name.toLowerCase()}`}
@@ -343,9 +343,9 @@ export default function Discover() {
             <section>
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-foreground">Trending Claims in Intuition Portal</h2>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   data-testid="button-show-all-trending-claims"
                 >
                   Show all
@@ -353,8 +353,8 @@ export default function Discover() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {trendingClaims.map((claim, index) => (
-                  <div 
-                    key={`claim-${index}`} 
+                  <div
+                    key={`claim-${index}`}
                     className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-6 hover-elevate cursor-pointer transition-all duration-200 relative overflow-hidden"
                     data-testid={`trending-claim-${index}`}
                   >
@@ -362,7 +362,7 @@ export default function Discover() {
                     <div className="absolute inset-0 opacity-10">
                       <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-transparent"></div>
                     </div>
-                    
+
                     {/* Content */}
                     <div className="relative z-10">
                       {/* Category Badge */}
@@ -371,15 +371,15 @@ export default function Discover() {
                           {claim.category}
                         </div>
                       </div>
-                      
+
                       {/* User Avatar Area */}
                       <div className="flex justify-center mb-4">
                         <div className="relative">
                           {/* Hexagonal border */}
                           <div className="w-20 h-20 bg-gray-700 border-2 border-gray-600 transform rotate-45 rounded-lg flex items-center justify-center overflow-hidden">
                             <div className="w-14 h-14 transform -rotate-45 rounded-lg overflow-hidden">
-                              <img 
-                                src={claim.avatar} 
+                              <img
+                                src={claim.avatar}
                                 alt={`${claim.author} avatar`}
                                 className="w-full h-full object-cover"
                               />
@@ -387,22 +387,22 @@ export default function Discover() {
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* Author and Time */}
                       <div className="text-center mb-3">
                         <div className="text-sm font-semibold text-white mb-1">{claim.author}</div>
                         <div className="text-xs text-gray-400">{claim.timeAgo}</div>
                       </div>
-                      
+
                       {/* Claim Content */}
                       <div className="mb-4">
                         <p className="text-sm text-gray-300 leading-relaxed line-clamp-4">{claim.content}</p>
                       </div>
-                      
+
                       {/* Engagement Metrics */}
                       <div className="flex justify-between items-center text-xs text-gray-400">
                         <span>{claim.attestations} attestations</span>
-                        <span className="text-green-400 font-semibold">{claim.tTrustEarned} tTRUST</span>
+                        <span className="text-green-400 font-semibold">{claim.trustEarned} TRUST</span>
                       </div>
                     </div>
                   </div>

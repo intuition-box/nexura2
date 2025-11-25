@@ -29,7 +29,7 @@ type Campaign = {
 
 export default function Campaigns() {
   const [, setLocation] = useLocation();
-  const [activeCampaigns, setActiveCampaigns] = useState<Campaign[]>([])
+  const [activeCampaigns, setActiveCampaigns] = useState<Campaign[]>([]);
   // const [upcomingCampaigns, setUpcomingCampaigns] = useState<Campaign[]>([])
 
   // const activeCampaigns = [
@@ -39,7 +39,7 @@ export default function Campaigns() {
   //     description: "Explore the revolutionary trust and reputation system built for the decentralized future. Join thousands of early adopters.",
   //     projectName: "Intuition",
   //     participants: 3200,
-  //     // rewardPool: "100,000 tTRUST",
+  //     // rewardPool: "100,000 TRUST",
   //     startDate: "Sep 19, 2024",
   //     endDate: "Nov 19, 2024",
   //     status: "Active",
@@ -52,7 +52,7 @@ export default function Campaigns() {
   //     description: "Master the art of creating meaningful attestations and build your reputation on Intuition.",
   //     projectName: "Intuition",
   //     participants: 1850,
-  //     // rewardPool: "50,000 tTRUST",
+  //     // rewardPool: "50,000 TRUST",
   //     startDate: "Sep 25, 2024",
   //     endDate: "Oct 25, 2024",
   //     status: "Active",
@@ -65,7 +65,7 @@ export default function Campaigns() {
   //     description: "Help expand the trust network by creating quality attestations and building meaningful connections.",
   //     projectName: "Intuition",
   //     participants: 950,
-  //     // rewardPool: "25,000 tTRUST",
+  //     // rewardPool: "25,000 TRUST",
   //     startDate: "Oct 5, 2024",
   //     endDate: "Nov 5, 2024",
   //     status: "Active",
@@ -81,7 +81,7 @@ export default function Campaigns() {
       description: "Join the next phase of Intuition's ecosystem development. Help shape the future of decentralized trust.",
       nameOfProject: "Intuition",
       participants: 0,
-      // rewardPool: "200,000 tTRUST",
+      // rewardPool: "200,000 TRUST",
       startDate: "Dec 1, 2024",
       endDate: "Feb 1, 2025",
       status: "Coming Soon",
@@ -89,7 +89,7 @@ export default function Campaigns() {
       projectCoverImage: developerAdoptionImg
     }
   ];
-  
+
   useEffect(() => {
     (async () => {
       const campaignsResponse = await apiRequest("GET", "/api/campaigns");
@@ -98,12 +98,12 @@ export default function Campaigns() {
     })();
   }, []);
 
-// orion - show an empty box with message if there are no upcoming or active campaigns
+  // orion - show an empty box with message if there are no upcoming or active campaigns
   const renderCampaignCard = (campaign: Campaign) => (
     <Card key={campaign.id} className="overflow-hidden hover-elevate group" data-testid={`campaign-${campaign.id}`}>
       {/* Hero Image */}
       <div className="relative h-48 overflow-hidden">
-        <img 
+        <img
           src={campaign.projectCoverImage}
           alt={campaign.title}
           className="w-full h-full object-cover transition-transform group-hover:scale-105"
@@ -112,9 +112,9 @@ export default function Campaigns() {
 
         {/* Status Badge */}
         <div className="absolute top-4 right-4">
-          <Badge 
+          <Badge
             className={
-              campaign.status === "Active" 
+              campaign.status === "Active"
                 ? "bg-green-500/10 text-green-500 border-green-500/30"
                 : "bg-blue-500/10 text-blue-500 border-blue-500/30"
             }
@@ -122,19 +122,19 @@ export default function Campaigns() {
             {campaign.status}
           </Badge>
         </div>
-        
+
         {/* Category */}
         <div className="absolute top-4 left-4">
           <div className="text-sm text-white/80 font-medium">{campaign.category}</div>
         </div>
       </div>
-      
+
       <CardHeader className="pb-3">
         <CardTitle className="text-lg font-semibold">{campaign.title}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-muted-foreground text-sm">{campaign.description}</p>
-        
+
         <div className="space-y-3">
           <div className="flex justify-between items-center text-sm">
             <span className="text-muted-foreground">Project:</span>
@@ -150,8 +150,8 @@ export default function Campaigns() {
           </div>
         </div>
 
-        <Button 
-          className="w-full" 
+        <Button
+          className="w-full"
           disabled={campaign.status !== "Active"}
           onClick={() => campaign.status === "Active" && setLocation(`/campaign/${campaign.id}`)}
           data-testid={`button-join-${campaign.id}`}
@@ -231,8 +231,8 @@ export default function Campaigns() {
               <div>
                 <h3 className="font-semibold text-foreground mb-2">What are Campaigns?</h3>
                 <p className="text-sm text-muted-foreground">
-                  Campaigns are unique, project-specific initiatives that allow you to contribute to ecosystem growth. 
-                  Unlike daily quests, campaigns have specific durations, larger reward pools, and focus on meaningful 
+                  Campaigns are unique, project-specific initiatives that allow you to contribute to ecosystem growth.
+                  Unlike daily quests, campaigns have specific durations, larger reward pools, and focus on meaningful
                   contributions to the NEXURA ecosystem and partner projects.
                 </p>
               </div>

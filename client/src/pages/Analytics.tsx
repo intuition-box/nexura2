@@ -13,7 +13,7 @@ export default function Analytics() {
     badges: 3, // Nexons
     questsCompleted: 12,
     rewardsEarned: 42,
-    tTrustEarned: 6.0
+    trustEarned: 6.0
   };
 
   const platformData = {
@@ -32,8 +32,8 @@ export default function Analytics() {
         {/* Header */}
         <div className="text-center py-12">
           <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-  <BarChart2 className="w-8 h-8 text-primary" />
-</div>
+            <BarChart2 className="w-8 h-8 text-primary" />
+          </div>
 
           <h1 className="text-3xl font-bold text-foreground mb-4">Analytics</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -103,11 +103,11 @@ export default function Analytics() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">tTRUST Earned</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground">TRUST Earned</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{userData.tTrustEarned}</div>
-                  <p className="text-xs text-muted-foreground">tTRUST earned</p>
+                  <div className="text-2xl font-bold">{userData.trustEarned}</div>
+                  <p className="text-xs text-muted-foreground">TRUST earned</p>
                 </CardContent>
               </Card>
             </>
@@ -155,11 +155,11 @@ export default function Analytics() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Total tTRUST</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total TRUST</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{platformData.totalTTrust}</div>
-                  <p className="text-xs text-muted-foreground">tTRUST distributed</p>
+                  <p className="text-xs text-muted-foreground">TRUST distributed</p>
                 </CardContent>
               </Card>
 

@@ -2,21 +2,21 @@ import { defineChain } from "viem";
 import { environment } from "./env.utils";
 
 const intuitionMainnet = defineChain({
-  id: 1155,
-  name: "Intuition Mainnet",
-  nativeCurrency: {
-    decimals: 18,
-    name: "TRUST",
-    symbol: "TRUST",
-  },
-  rpcUrls: {
-    default: {
-      http: ["https://rpc.intuition.systems"],
-    },
-  },
-  blockExplorers: {
-    default: { name: "Explorer", url: "https://explorer.intuition.systems" },
-  },
+	id: 1155,
+	name: "Intuition Mainnet",
+	nativeCurrency: {
+		decimals: 18,
+		name: "TRUST",
+		symbol: "TRUST",
+	},
+	rpcUrls: {
+		default: {
+			http: ["https://rpc.intuition.systems"],
+		},
+	},
+	blockExplorers: {
+		default: { name: "Explorer", url: "https://explorer.intuition.systems" },
+	},
 });
 
 const intuitionTestnet = defineChain({
@@ -24,8 +24,8 @@ const intuitionTestnet = defineChain({
 	name: "Intuition Testnet",
 	nativeCurrency: {
 		decimals: 18,
-		name: "tTRUST",
-		symbol: "tTRUST",
+		name: "TRUST",
+		symbol: "TRUST",
 	},
 	rpcUrls: {
 		default: {
@@ -33,10 +33,14 @@ const intuitionTestnet = defineChain({
 		},
 	},
 	blockExplorers: {
-		default: { name: "Explorer", url: "https://testnet.explorer.intuition.systems" },
+		default: {
+			name: "Explorer",
+			url: "https://testnet.explorer.intuition.systems",
+		},
 	},
 });
 
-const chain = environment === "production" ? intuitionMainnet : intuitionTestnet;
+const chain =
+	environment === "production" ? intuitionMainnet : intuitionTestnet;
 
 export default chain;

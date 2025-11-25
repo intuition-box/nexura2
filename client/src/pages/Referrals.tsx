@@ -23,7 +23,7 @@ export default function Referrals() {
     setCopied(true);
     toast({
       title: "Link copied!",
-      description: "Share this link to earn tTRUST rewards",
+      description: "Share this link to earn TRUST rewards",
     });
     setTimeout(() => setCopied(false), 2000);
   };
@@ -40,8 +40,8 @@ export default function Referrals() {
   // Calculate milestone logic
   const nextMilestone =
     referralStats.totalReferrals >= 10 ? 20 :
-    referralStats.totalReferrals >= 3 ? 10 : 
-    3;
+      referralStats.totalReferrals >= 3 ? 10 :
+        3;
 
   const progress = (referralStats.totalReferrals / nextMilestone) * 100;
 
@@ -53,7 +53,7 @@ export default function Referrals() {
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground mb-2">Referral Program</h1>
           <p className="text-muted-foreground">
-            Invite friends to NEXURA and earn tTRUST rewards together
+            Invite friends to NEXURA and earn TRUST rewards together
           </p>
         </div>
 
@@ -78,7 +78,7 @@ export default function Referrals() {
             <CardContent>
               <div className="flex items-center space-x-2">
                 <Star className="w-5 h-5" />
-                <div className="text-2xl font-bold">{referralStats.totalEarned} tTRUST</div>
+                <div className="text-2xl font-bold">{referralStats.totalEarned} TRUST</div>
               </div>
             </CardContent>
           </Card>
@@ -90,7 +90,7 @@ export default function Referrals() {
             <CardContent>
               <div className="flex items-center space-x-2">
                 <Gift className="w-5 h-5" />
-                <div className="text-2xl font-bold">{referralStats.claimableRewards} tTRUST</div>
+                <div className="text-2xl font-bold">{referralStats.claimableRewards} TRUST</div>
               </div>
             </CardContent>
           </Card>
@@ -154,7 +154,7 @@ export default function Referrals() {
             {referralStats.claimableRewards > 0 && (
               <Button onClick={handleClaimRewards} className="w-full">
                 <Gift className="w-4 h-4 mr-2" />
-                Claim {referralStats.claimableRewards} tTRUST
+                Claim {referralStats.claimableRewards} TRUST
               </Button>
             )}
           </CardContent>

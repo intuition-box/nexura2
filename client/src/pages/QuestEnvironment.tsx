@@ -43,53 +43,53 @@ export default function QuestEnvironment() {
           title: "Complete Profile Verification",
           description: "Connect Discord, connect X, connect email address, and hold a .trust domain",
           type: "Daily Quest",
-          reward: "0.5 tTRUST",
+          reward: "0.5 TRUST",
           timeLeft: "23h 45m"
         },
         "daily-2": {
           title: "Join Community Discussion",
           description: "Participate in at least one community discussion",
-          type: "Daily Quest", 
-          reward: "0.5 tTRUST",
+          type: "Daily Quest",
+          reward: "0.5 TRUST",
           timeLeft: "23h 45m"
         },
         "daily-3": {
           title: "Share Intuition Project",
           description: "Share an Intuition project with the community",
           type: "Daily Quest",
-          reward: "0.5 tTRUST", 
+          reward: "0.5 TRUST",
           timeLeft: "23h 45m"
         },
         "weekly-1": {
           title: "Complete 7-Day Streak",
           description: "Complete daily quests for 7 consecutive days",
           type: "Weekly Quest",
-          reward: "3.5 tTRUST",
+          reward: "3.5 TRUST",
           timeLeft: "4d 12h"
         },
         "weekly-2": {
           title: "Refer 3 New Users",
           description: "Invite 3 friends to join NEXURA",
           type: "Weekly Quest",
-          reward: "2.0 tTRUST",
+          reward: "2.0 TRUST",
           timeLeft: "4d 12h"
         },
         "monthly-1": {
           title: "Maintain 30-Day Streak",
           description: "Complete daily quests for 30 consecutive days",
           type: "Monthly Quest",
-          reward: "15.0 tTRUST",
+          reward: "15.0 TRUST",
           timeLeft: "25d 8h"
         },
         "monthly-2": {
           title: "Community Leader",
           description: "Be among the top 10 contributors this month",
           type: "Monthly Quest",
-          reward: "10.0 tTRUST",
+          reward: "10.0 TRUST",
           timeLeft: "25d 8h"
         }
       };
-      
+
       setQuestData(mockQuestData[params.questId as keyof typeof mockQuestData] || null);
     }
   }, [params?.questId]);
@@ -103,9 +103,9 @@ export default function QuestEnvironment() {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Back Button */}
         <div className="flex items-center space-x-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setLocation(getBackLocation())}
             data-testid="button-back-to-quests"
           >
@@ -147,11 +147,11 @@ export default function QuestEnvironment() {
                   <div className="space-y-2">
                     <h2 className="text-2xl font-bold text-muted-foreground">NOTHING HERE YET</h2>
                     <p className="text-muted-foreground max-w-md mx-auto">
-                      Quest content and interactions will be implemented here. 
+                      Quest content and interactions will be implemented here.
                       This is where users will complete their quest objectives.
                     </p>
                   </div>
-                  
+
                   {/* Placeholder Action Button */}
                   <Button size="lg" disabled data-testid="button-quest-action">
                     Quest Content Coming Soon
@@ -171,9 +171,9 @@ export default function QuestEnvironment() {
                     The quest you're looking for doesn't exist or has been removed.
                   </p>
                 </div>
-                
-                <Button 
-                  size="lg" 
+
+                <Button
+                  size="lg"
                   onClick={() => setLocation(getBackLocation())}
                   data-testid="button-back-to-quests-from-error"
                 >
