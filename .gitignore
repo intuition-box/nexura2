@@ -15,12 +15,6 @@ yarn-error.log*
 pnpm-debug.log*
 *.log
 
-# Environment files
-.env
-.env.*
-.!env.example
-!.env.local
-.env.local
 
 # TypeScript
 *.tsbuildinfo
