@@ -9,9 +9,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false
+        sync: true
       - key: SESSION_SECRET
-        generateValue: true
+        generateValue: false
       - key: SESSION_COOKIE_NAME
         value: nexura_sid
       - key: WALLET_CONNECT_PROJECT_ID
