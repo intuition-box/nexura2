@@ -13,6 +13,7 @@ import { FaDiscord, FaTwitter } from "react-icons/fa";
 import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { emitSessionChange } from "@/lib/session";
+import { apiRequest } from "@/lib/queryClient";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AnimatedBackground from "@/components/AnimatedBackground";
 
@@ -80,22 +81,7 @@ export default function EditProfile() {
           socialProfiles: profileData.socialProfiles
         };
 
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        try {
-          const token = localStorage.getItem('accessToken');
-          if (token) headers['Authorization'] = `Bearer ${token}`;
-        } catch (e) { /* ignore */ }
-
-        const res = await fetch(buildUrl('/api/users/profile'), {
-          method: 'PUT',
-          headers,
-          credentials: 'include',
-          body: JSON.stringify(updatePayload)
-        });
-
-        if (!res.ok) {
-          throw new Error('Failed to save profile');
-        }
+        const res = await apiRequest('PUT', '/api/users/profile', updatePayload);
 
         // Refresh the user session to update profile data
         emitSessionChange();

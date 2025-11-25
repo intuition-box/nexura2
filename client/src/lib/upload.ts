@@ -28,7 +28,6 @@ export async function uploadFile(file: File, folder = "images") {
     const response = await fetch(buildUrl('/api/upload/avatar'), {
       method: 'POST',
       headers,
-      credentials: 'include',
       body: JSON.stringify({ imageData: dataUrl, fileName: file.name })
     });
 
@@ -39,7 +38,7 @@ export async function uploadFile(file: File, folder = "images") {
     const result = await response.json();
     return result.url || dataUrl;
   } catch (err) {
-    console.warn("Upload failed, using data URL directly", err);
+    console.warn("Upload failed, using data URL directly", String(err));
     return await new Promise<string | null>((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);

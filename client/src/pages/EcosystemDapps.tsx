@@ -332,7 +332,7 @@ export default function EcosystemDapps() {
     try {
       const headers: Record<string,string> = { 'Content-Type': 'application/json' };
       try { const token = localStorage.getItem('accessToken'); if (token) headers['Authorization'] = `Bearer ${token}`; } catch(e){}
-      const resp = await fetch(buildUrl('/api/xp/add'), { method: 'POST', headers, credentials: 'include', body: JSON.stringify({ userId: user.id, xp, questId: dapp.id, questsCompletedDelta: 0, tasksCompletedDelta: 0 }) });
+      const resp = await fetch(buildUrl('/api/xp/add'), { method: 'POST', headers, body: JSON.stringify({ userId: user.id, xp, questId: dapp.id, questsCompletedDelta: 0, tasksCompletedDelta: 0 }) });
       if (resp.status === 409) {
         // already claimed
         markClaimed(dapp.id);

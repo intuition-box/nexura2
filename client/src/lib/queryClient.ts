@@ -48,9 +48,6 @@ export async function apiRequest(
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
-    // Allow sending cookies for server-side sessions; server CORS will
-    // only accept credentials in production if FRONTEND_URL is configured.
-    credentials: 'include',
   });
 
   await throwIfResNotOk(res);
@@ -65,10 +62,7 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }: { queryKey: readonly unknown[] }) => {
     const path = (queryKey as string[]).join("/");
     const headers = buildAuthHeaders();
-    const res = await fetch(buildUrl(path), {
-      headers,
-      credentials: 'include',
-    });
+    const res = await fetch(buildUrl(path), { headers });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;

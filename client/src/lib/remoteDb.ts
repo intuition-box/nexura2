@@ -22,18 +22,20 @@ async function safeFetch(url: string, opts: any) {
   const fullUrl = url.startsWith('http') ? url : buildUrl(url);
   const finalOpts = { ...(opts || {}) };
   try {
-    // If this is a same-origin or relative request, include credentials so cookie-based
-    // sessions are sent to the backend. Avoid sending credentials to arbitrary external
-    // third-party endpoints.
+    // Inject Authorization header from localStorage if available
     if (typeof window !== 'undefined') {
-      const isRelative = fullUrl.startsWith('/');
-      const isSameOrigin = fullUrl.startsWith(window.location.origin);
-      if (isRelative || isSameOrigin) {
-        finalOpts.credentials = finalOpts.credentials || 'include';
-      }
+      try {
+        const token = localStorage.getItem('accessToken');
+        if (token) {
+          finalOpts.headers = finalOpts.headers || {};
+          if (!finalOpts.headers['Authorization'] && !finalOpts.headers['authorization']) {
+            finalOpts.headers['Authorization'] = `Bearer ${token}`;
+          }
+        }
+      } catch (e) { /* ignore */ }
     }
   } catch (e) {
-    // ignore and proceed without credentials
+    // ignore
   }
   const res = await fetch(fullUrl, finalOpts);
   if (!res.ok) {
@@ -101,14 +103,12 @@ export async function createUserFromWallet(payload: User) {
   // Prefer an external users backend when configured. Otherwise rely on the
   // server-side wallet auth flow which will auto-provision users on /auth/wallet.
   try {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
     try {
-      const token = localStorage.getItem('accessToken');
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-    } catch (e) { /* ignore */ }
-
-      const res = await fetch(buildUrl(`/api/me`), { method: "GET", headers, credentials: 'include' });
-    if (res.ok) return res.json();
+      const json = await safeFetch(`/api/me`, { method: "GET" });
+      return json;
+    } catch (e) {
+      // ignore
+    }
   } catch (e) {
     // ignore
   }

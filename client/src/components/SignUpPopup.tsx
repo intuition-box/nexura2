@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useWallet } from "@/hooks/use-wallet";
 import { createUserFromWallet, createProjectAccount } from "@/lib/remoteDb";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { KeyRound } from "lucide-react";
 
@@ -29,13 +30,11 @@ export default function SignUpPopup({ mode = "user" as "user" | "project", actio
         // prefer server-driven session and profile check
         try {
           // ping /api/me to let server create a minimal user via /auth/wallet if needed
-          // The server will create a user on /auth/wallet; here we'll call /api/me to detect profile
-          const meRes = await fetch(buildUrl(`/api/me`), { credentials: 'include' });
-          if (meRes.ok) {
+          const meRes = await apiRequest('GET', '/api/me').catch(() => null);
+          if (meRes) {
             const json = await meRes.json().catch(() => ({}));
             setOpen(false);
             if (json?.hasProfile) {
-              // Stay on current page/dashboard instead of redirecting
               window.location.reload();
             } else {
               alert("Account created — please complete your profile");
@@ -65,8 +64,8 @@ export default function SignUpPopup({ mode = "user" as "user" | "project", actio
         }
         // check if the user already has projects
         try {
-          const res = await fetch(buildUrl(`/projects`), { credentials: 'include' });
-          if (res.ok) {
+          const res = await apiRequest('GET', '/projects').catch(() => null);
+          if (res) {
             const list = await res.json();
             const my = list.find((p: any) => p.ownerAddress && p.ownerAddress.toLowerCase() === (connectedAddress || "").toLowerCase());
             setOpen(false);

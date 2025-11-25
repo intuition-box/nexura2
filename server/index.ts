@@ -1,117 +1,17 @@
 import dotenv from "dotenv";
-// Provide a CommonJS `require` shim for modules that use `require()` in ESM
 import { createRequire } from 'module';
-// expose a require function on globalThis so legacy modules using `require()` still work
-(globalThis as any).require = createRequire(import.meta.url);
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
-
-// Load local env file if present. This intentionally reads `.env.local` so
-// developers can keep per-machine settings. The file is tracked per your
-// request (not ignored) so replace placeholder values with real secrets.
-try {
-  dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
-} catch (e) {
-  // ignore if dotenv not available or fails
-}
+try { dotenv.config({ path: path.resolve(process.cwd(), ".env.local") }); } catch {}
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
-import pg from "pg";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-  // Session middleware: prefer a persistent store when DATABASE_URL is provided.
-  // This enables server-side sessions (cookie-based) for production deployments
-  // such as Render. The session cookie is Secure in production and uses a
-  // server-side store backed by Postgres via connect-pg-simple when available.
-  const SESSION_SECRET = process.env.SESSION_SECRET || process.env.SECRET || "replace-me";
-  const pgConnection = process.env.DATABASE_URL || process.env.PG_CONNECTION_STRING || null;
-  const PgSession = connectPgSimple(session as any);
-  let sessionStore: any = undefined;
-  let pgPool: any = undefined;
-
-  try {
-    if (pgConnection) {
-      pgPool = new pg.Pool({ connectionString: pgConnection });
-      sessionStore = new PgSession({ pool: pgPool });
-      // ensure session table exists to avoid runtime errors in production
-      try {
-        const createSql = `CREATE TABLE IF NOT EXISTS session (sid varchar NOT NULL, sess json NOT NULL, expire timestamp(6) NOT NULL); CREATE INDEX IF NOT EXISTS IDX_session_expire ON session (expire);`;
-        await pgPool.query(createSql);
-      } catch (pgErr) {
-        console.warn('Could not ensure session table exists:', pgErr && pgErr.message ? pgErr.message : pgErr);
-      }
-    }
-  } catch (e) {
-    console.warn("Failed to initialize Postgres session store, falling back to in-memory store", e);
-    sessionStore = undefined;
-  }
-
-  app.use(
-    session({
-      store: sessionStore,
-      secret: SESSION_SECRET,
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        secure: process.env.NODE_ENV === "production",
-        httpOnly: true,
-        // In production serverless deployments where frontend may be on a different origin,
-        // we need SameSite='none' and secure cookies. In development default to 'lax'.
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        maxAge: 1000 * 60 * 60 * 24 * 7,
-      },
-    }) as any,
-  );
-
-  // If running behind a proxy or CDN (typical in serverless), trust the first proxy
-  if (process.env.NODE_ENV === 'production') {
-    try {
-      app.set('trust proxy', 1);
-    } catch (e) {
-      // ignore
-    }
-  }
-
-// CORS: do not use cookies or credentialed requests. The API uses Authorization: Bearer <token>
-// Allow cross-origin requests but do NOT advertise support for credentials/cookies.
-app.use((req, res, next) => {
-  // CORS configuration. In production, prefer an explicit FRONTEND_URL so we
-  // can enable credentialed cookie-based sessions. In development we allow
-  // any origin to simplify testing (no credentials).
-  // Normalize configured frontend origin to avoid accidental mismatches
-  // (some deploy dashboards allow a trailing slash which breaks exact origin
-  // comparison). We also allow an explicit FRONTEND_URL to enable credentialed
-  // cookie requests in production.
-  let FRONTEND_URL = process.env.FRONTEND_URL || process.env.VITE_FRONTEND_URL || null;
-  if (typeof FRONTEND_URL === 'string') {
-    FRONTEND_URL = FRONTEND_URL.trim().replace(/\/+$/g, "");
-  }
-
-  if (process.env.NODE_ENV === 'production' && FRONTEND_URL) {
-    res.setHeader('Access-Control-Allow-Origin', FRONTEND_URL);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
-
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
-  );
-
-  // Handle preflight
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-
-  next();
-});
+// CORS for bearer-token auth
+app.use((req, res, next) => { res.setHeader('Access-Control-Allow-Origin', '*'); res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS'); res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization'); if (req.method === 'OPTIONS') return res.status(204).end(); next(); });
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -143,24 +43,21 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve attached_assets before the catch-all route
 app.use("/attached_assets", express.static(path.resolve(import.meta.dirname, "..", "attached_assets")));
-
-// Serve uploaded files
 app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 
 (async () => {
   try {
     const server = await registerRoutes(app);
 
-    // Seed tasks on server start (in development)
+    // Seed tasks in development
     if (app.get("env") === "development") {
       try {
         const { seedTasks } = await import("./seedTasks");
         await seedTasks();
         log("✓ Tasks seeded successfully");
       } catch (error) {
-        log("⚠ Failed to seed tasks:", error);
+        log("⚠ Failed to seed tasks: " + String(error));
       }
     }
 
@@ -172,23 +69,17 @@ app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
       console.error('Express error handler:', err);
     });
 
-    // importantly only setup vite in development and after
-    // setting up all the other routes so the catch-all route
-    // doesn't interfere with the other routes
+    // Setup vite in development
     if (app.get("env") === "development") {
       await setupVite(app, server);
     } else {
       serveStatic(app);
     }
 
-    // ALWAYS serve the app on the port specified in the environment variable PORT
-    // Render and other cloud platforms use the PORT environment variable
-    // Default to 5051 for local development
+    // Start server
     const port = parseInt(process.env.PORT || '5051', 10);
     const host = process.env.HOST || "0.0.0.0";
-    
-    // `reusePort` is not supported on some platforms (notably Windows). Only set it when
-    // the platform looks like a Unix-like environment.
+    // reusePort used on unix-like platforms
     const listenOptions: any = { port, host };
     if (process.platform !== "win32") {
       listenOptions.reusePort = true;

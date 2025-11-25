@@ -44,13 +44,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log("❌ No accessToken found for /api/me");
         }
 
-        // Use regular fetch instead of apiRequest to avoid thrown errors
-        // Include credentials so server-side cookie sessions are sent.
-        const res = await fetch(buildUrl("/api/me"), {
-          headers,
-          credentials: 'include',
-        }).catch(err => {
-          console.warn("Network error fetching profile:", err);
+        // Use apiRequest which includes Authorization: Bearer <token> when present
+        const res = await apiRequest("GET", "/api/me").catch(err => {
+          console.warn("Network error fetching profile:", String(err));
           return null;
         });
 
@@ -108,15 +104,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const unsub = onSessionChange(async () => {
       try {
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-        const token = getSessionToken();
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        const res = await fetch(buildUrl("/api/me"), { headers, credentials: 'include' });
-
+        const res = await apiRequest("GET", "/api/me");
         if (res.ok) {
           const json = await res.json();
           const userData = json?.user ? { ...json.user, ...(json.profile || {}) } : null;
-          
+
           console.log('[AuthProvider] Session change - received data:', {
             hasUser: !!json?.user,
             hasProfile: !!json?.profile,
@@ -124,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isArray: Array.isArray(userData),
             isNull: userData === null
           });
-          
+
           if (userData && typeof userData === 'object' && !Array.isArray(userData) && userData !== null) {
             console.log('[AuthProvider] Session change - setting valid user data');
             setUser(userData);
@@ -135,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
       } catch (e) {
-        console.warn("[AuthProvider] Failed to fetch profile after session change:", e);
+        console.warn("[AuthProvider] Failed to fetch profile after session change:", String(e));
       }
       // Do not clear the existing user on transient session-refresh failures.
       // Keep the current user state to avoid flicker; the app can re-fetch

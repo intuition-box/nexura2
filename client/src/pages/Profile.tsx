@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { XP_PER_LEVEL } from "@shared/schema";
 import { Progress } from "@/components/ui/progress";
 import { emitSessionChange } from "@/lib/session";
+import { apiRequest } from "@/lib/queryClient";
 import AnimatedBackground from "@/components/AnimatedBackground";
 
 // Prefer a runtime-injected backend URL (window.__BACKEND_URL__), then Vite env var.
@@ -86,15 +87,9 @@ export default function Profile() {
   useEffect(() => {
     if (user?.id) {
       setLoadingReferrals(true);
-      fetch(buildUrl(`/api/referrals/stats/${user.id}`), { credentials: 'include' })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data?.totalReferrals !== undefined) {
-            setReferralCount(data.totalReferrals);
-          }
-        })
-        .catch(err => console.warn('Failed to fetch referral stats:', err))
-        .finally(() => setLoadingReferrals(false));
+      apiRequest('GET', `/api/referrals/stats/${user.id}`).then(r => r.json()).then(data => {
+        if (data?.totalReferrals !== undefined) setReferralCount(data.totalReferrals);
+      }).catch(err => console.warn('Failed to fetch referral stats:', err)).finally(() => setLoadingReferrals(false));
     }
   }, [user?.id]);
 

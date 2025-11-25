@@ -16,13 +16,9 @@ async function fetchMintedStatuses(userId: string, maxLevel: number) {
   for (let level = 1; level <= maxLevel; level++) {
     promises.push((async () => {
       try {
-        const res = await fetch(`/api/tiers/mint/${encodeURIComponent(userId)}/${level}`, { credentials: 'include' });
-        if (res.ok) {
-          const json = await res.json();
-          out[level] = { minted: true, record: json };
-        } else {
-          out[level] = { minted: false };
-        }
+        const res = await apiRequest('GET', `/api/tiers/mint/${encodeURIComponent(userId)}/${level}`);
+        const json = await res.json();
+        out[level] = { minted: true, record: json };
       } catch (e) {
         out[level] = { minted: false };
       }

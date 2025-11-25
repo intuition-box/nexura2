@@ -25,9 +25,8 @@ try {
   // AWS SDK not installed or not configured; we'll fallback to local filesystem in dev
 }
 
-// In-memory stores for challenges and legacy bearer sessions. For production
-// we prefer server-side sessions (express-session) backed by Postgres.
-const challenges = new Map<string, { message: string; expiresAt: number; used?: boolean }>();// legacy
+// In-memory stores for challenges and legacy bearer sessions.
+const challenges = new Map<string, { message: string; expiresAt: number; used?: boolean }>();
 const sessions = new Map<string, { address: string; createdAt: number }>();
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -41,10 +40,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Debug endpoint to inspect incoming cookies and session contents.
-  // Disabled by default in production. To enable in any environment, set
-  // DEBUG_SESSION_SECRET in the environment and supply the same value in
-  // the `X-Debug-Secret` request header when calling this endpoint.
+  // Debug endpoint to inspect incoming headers and session-like info.
   app.get('/api/debug-session', (req, res) => {
     const secret = process.env.DEBUG_SESSION_SECRET || null;
     if (!secret) return res.status(404).json({ error: 'not available' });
@@ -52,12 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (provided !== secret) return res.status(403).json({ error: 'forbidden' });
 
     try {
-      const info = {
-        headers: req.headers,
-        cookieHeader: req.headers.cookie || null,
-        session: (req as any).session || null,
-        sessionID: (req as any).sessionID || null,
-      };
+      const info = { headers: req.headers, cookieHeader: req.headers.cookie || null };
       return res.json(info);
     } catch (e) {
       return res.status(500).json({ error: 'failed', details: String(e) });
@@ -119,10 +110,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               referredUser = {
                 id: u?.id || referredId,
                 username: u?.username || null,
-                displayName: p?.displayName || u?.displayName || u?.username || null,
-                avatar: p?.avatar || u?.avatar || null,
-                xp: p?.xp || 0,
-                level: p?.level || 1,
+                displayName: (p as any)?.displayName || (u as any)?.displayName || u?.username || null,
+                avatar: (p as any)?.avatar || (u as any)?.avatar || null,
+                xp: (p as any)?.xp || 0,
+                level: (p as any)?.level || 1,
               };
             }
           } catch (e) {
@@ -132,9 +123,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         out.push({
           id: ev.id,
-          referrerUserId: ev.referrerUserId || ev.referrer_user_id,
+          referrerUserId: ev.referrerUserId || (ev as any).referrer_user_id,
           referredUserId: referredId,
-          createdAt: ev.createdAt || ev.created_at || null,
+          createdAt: ev.createdAt || (ev as any).created_at || null,
           referredUser,
         });
       }
@@ -179,9 +170,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!secret) return res.status(404).json({ error: 'not available' });
       if (provided !== secret) return res.status(403).json({ error: 'forbidden' });
       const arr: any[] = [];
-      for (const [token, obj] of sessions.entries()) {
+      sessions.forEach((obj, token) => {
         arr.push({ token, address: obj.address || null, createdAt: obj.createdAt || null });
-      }
+      });
       return res.json({ sessions: arr });
     } catch (e) {
       console.error('/__admin/export-sessions error', e);
@@ -189,8 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dev/Admin: migrate current in-memory legacy sessions into DB-backed `user_session_tokens` table
-  // This preserves the original token strings so existing clients continue to work.
+  // Dev/Admin: migrate in-memory legacy sessions into DB-backed user_session_tokens
   app.post('/__admin/migrate-sessions', async (req, res) => {
     try {
       const secret = process.env.DEBUG_SESSION_SECRET || null;
@@ -201,10 +191,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const migrated: string[] = [];
       const skipped: string[] = [];
 
-      // If storage exposes a query method (NeonStorage), use it to insert preserving token values.
       const poolish = (storage as any).query ? (storage as any) : null;
 
-      for (const [token, obj] of sessions.entries()) {
+      const entries = Array.from(sessions.entries());
+      for (const [token, obj] of entries) {
         const address = obj.address ? String(obj.address).toLowerCase() : null;
         const createdAt = obj.createdAt ? new Date(obj.createdAt) : new Date();
 
@@ -221,22 +211,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (poolish && typeof poolish.query === 'function') {
             await poolish.query(`INSERT INTO user_session_tokens (token, user_id, address, created_at) VALUES ($1,$2,$3,$4) ON CONFLICT (token) DO NOTHING`, [token, userId, address, createdAt]);
           } else {
-            // MemStorage: directly set its sessionTokens map to preserve the token value
-            try {
-              const mem = storage as any;
-              if (mem && mem.sessionTokens && typeof mem.sessionTokens.set === 'function') {
-                mem.sessionTokens.set(token, { userId: userId || '', address: address || '', createdAt: createdAt.toISOString() });
-              } else if (mem && typeof mem.createSessionToken === 'function') {
-                // fallback: create a new token entry (will generate a new token) - not ideal
-                await mem.createSessionToken(userId || '', address || null);
-              }
-            } catch (e) {
-              // ignore
+            const mem = storage as any;
+            if (mem && mem.sessionTokens && typeof mem.sessionTokens.set === 'function') {
+              mem.sessionTokens.set(token, { userId: userId || '', address: address || '', createdAt: createdAt.toISOString() });
+            } else if (mem && typeof mem.createSessionToken === 'function') {
+              await mem.createSessionToken(userId || '', address || null);
             }
           }
           migrated.push(token);
         } catch (e) {
-          console.warn('failed to migrate token', token, e && e.message ? e.message : e);
+          console.warn('failed to migrate token', token, String(e));
           skipped.push(token);
         }
       }
@@ -301,24 +285,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // mark challenge used
       if (stored) stored.used = true;
 
-
-      // Establish a server-side session for this authenticated user. We save the
-      // wallet address onto the session so subsequent requests can use cookie
-      // based authentication. This is the production-friendly behavior for
-      // deployments (e.g., Render). We still retain the legacy sessions map
-      // for bearer-token compatibility where necessary.
+      // Create a bearer token and persist it (prefer DB via storage.createSessionToken)
+      let token: string;
       try {
-        (req as any).session.address = String(address).toLowerCase();
-        (req as any).session.createdAt = Date.now();
+        if (storage && typeof (storage as any).createSessionToken === 'function') {
+          // Try to resolve user id by address
+          let userIdForToken: string | null = null;
+          try {
+            const maybeUser = await storage.getUserByAddress(String(address).toLowerCase());
+            if (maybeUser && (maybeUser as any).id) userIdForToken = (maybeUser as any).id;
+          } catch (err) { /* ignore */ }
+          token = await (storage as any).createSessionToken(userIdForToken || '', String(address).toLowerCase());
+        } else {
+          token = crypto.randomBytes(32).toString("hex");
+          sessions.set(token, { address: String(address).toLowerCase(), createdAt: Date.now() });
+        }
       } catch (e) {
-        console.warn('failed to set cookie session', e);
+        console.warn('failed to persist session token to storage, falling back to in-memory token', String(e));
+        token = crypto.randomBytes(32).toString("hex");
+        sessions.set(token, { address: String(address).toLowerCase(), createdAt: Date.now() });
       }
-
-      // For backward compatibility with any clients expecting a bearer token,
-      // also create a short-lived legacy bearer token and return it in the
-      // response. This gives clients time to migrate to cookie-based sessions.
-      const token = crypto.randomBytes(32).toString("hex");
-      sessions.set(token, { address: String(address).toLowerCase(), createdAt: Date.now() });
 
       // Ensure a user record exists for this address so /profile can return user data.
       try {
@@ -331,17 +317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           user = await storage.createUser({ username: addrLower, password: randPwd, address: addrLower } as any);
         }
 
-        // Persist the canonical reference to the user id on the server-side session.
-        // This allows the rest of the app to rely on a stable DB primary key rather
-        // than just an address string and makes server-side sessions fully DB-backed
-        // (session store persists session JSON; user record persists in storage).
-        try {
-          (req as any).session.userId = (user as any).id || null;
-          (req as any).session.address = addrLower;
-          (req as any).session.createdAt = Date.now();
-        } catch (e) {
-          console.warn('failed to set cookie session (userId)', e);
-        }
+        // Nothing to persist to cookies; clients should store bearer token.
       } catch (e) {
         console.warn("failed to ensure user record for address", e);
       }
@@ -365,81 +341,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // parseCookies removed: authentication uses Authorization: Bearer <token> only
 
-  // helper to require an authenticated session token
-  // Only accepts Authorization: Bearer <token>.
+  // Require an Authorization: Bearer <token> header and resolve session from storage
   async function getSessionFromReq(req: any) {
     try {
-      console.log(`🔍 Auth check for ${req.method} ${req.path}`);
+      const auth = String(req.headers.authorization || "").trim();
+      if (!auth || !auth.toLowerCase().startsWith('bearer ')) return null;
+      const token = auth.split(/\s+/)[1];
+      if (!token) return null;
 
-      // Primary: server-side cookie session (express-session)
-      try {
-        if (req.session) {
-          // Prefer a canonical DB user id stored on the session when available
-          const userId = req.session.userId || null;
-          const address = req.session.address ? String(req.session.address).toLowerCase() : null;
-          if (userId || address) {
-            const token = req.sessionID || null;
-            const sessionObj: any = { createdAt: req.session.createdAt || Date.now() };
-            if (userId) sessionObj.userId = userId;
-            if (address) sessionObj.address = address;
-            console.log(`✅ Auth via server-side session for ${userId ? `userId=${String(userId).substring(0,10)}` : String(address).substring(0,10)}...`);
+      if (storage && typeof (storage as any).getSessionByToken === 'function') {
+        try {
+          const dbSess = await (storage as any).getSessionByToken(token);
+          if (dbSess) {
+            const sessionObj: any = { createdAt: dbSess.createdAt || Date.now() };
+            if (dbSess.userId) sessionObj.userId = dbSess.userId;
+            if (dbSess.address) sessionObj.address = String(dbSess.address).toLowerCase();
             return { token, session: sessionObj };
           }
+        } catch (e) {
+          console.warn('error checking DB session token', String(e));
         }
-      } catch (e) {
-        console.warn('session check failed', e);
       }
 
-      // Fallback: Bearer token support — use DB-backed session tokens only.
-      // In production we require Neon/Postgres-backed tokens. For development
-      // we may fall back to the in-memory `sessions` map if Neon isn't available.
-      try {
-        const auth = String(req.headers.authorization || "").trim();
-        if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
-          console.log('❌ No Bearer authorization header present');
-          return null;
-        }
-        const token = auth.split(/\s+/)[1];
-        if (!token) {
-          console.log('❌ Malformed Bearer token');
-          return null;
-        }
-
-        // Prefer storage-backed tokens (NeonStorage). This ensures production
-        // authentication always consults the database rather than transient
-        // in-memory state.
-        if (storage && typeof (storage as any).getSessionByToken === 'function') {
-          try {
-            const dbSess = await (storage as any).getSessionByToken(token);
-            if (dbSess) {
-              const sessionObj: any = { createdAt: dbSess.createdAt || Date.now() };
-              if (dbSess.userId) sessionObj.userId = dbSess.userId;
-              if (dbSess.address) sessionObj.address = String(dbSess.address).toLowerCase();
-              console.log(`✅ Auth via DB-backed token for ${String(sessionObj.address || sessionObj.userId).substring(0,10)}...`);
-              return { token, session: sessionObj };
-            }
-            console.log('❌ Bearer token not found in DB');
-          } catch (e) {
-            console.warn('error checking DB session token', e && e.message ? e.message : e);
-          }
-        }
-
-        // Development fallback: in-memory sessions map
-        if ((process.env.NODE_ENV || 'development') !== 'production') {
-          const s = sessions.get(token);
-          if (s) {
-            console.log(`✅ Auth via in-memory dev token for ${s.address.substring(0, 10)}...`);
-            return { token, session: s };
-          }
-        }
-
-        return null;
-      } catch (e) {
-        console.log('❌ Auth error:', e);
-        return null;
+      // Dev fallback: in-memory sessions map
+      if ((process.env.NODE_ENV || 'development') !== 'production') {
+        const s = sessions.get(token);
+        if (s) return { token, session: s };
       }
+      return null;
     } catch (e) {
-      console.log('❌ Auth error:', e);
+      console.warn('getSessionFromReq failed', String(e));
       return null;
     }
   }
@@ -777,22 +708,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Logout: clear server-side session and instruct client to remove cookie
+  // Logout: remove bearer token (DB or in-memory). Clients should remove local token.
   app.post("/auth/logout", async (req, res) => {
     try {
       const sess = await getSessionFromReq(req);
-      // Destroy server-side cookie session if present
+      // Remove bearer token: delete from DB if supported, otherwise clear in-memory
       try {
-        if ((req as any).session) {
-          (req as any).session.destroy?.(() => {});
+        if (sess && sess.token) {
+          if (storage && typeof (storage as any).deleteSessionToken === 'function') {
+            try { await (storage as any).deleteSessionToken(sess.token); } catch (e) { console.warn('deleteSessionToken failed', String(e)); }
+          }
+          if (sessions.has(sess.token)) sessions.delete(sess.token);
         }
       } catch (e) {
-        console.warn('failed to destroy server session', e);
-      }
-
-      // Remove legacy bearer token if present
-      if (sess && sess.token && sessions.has(sess.token)) {
-        sessions.delete(sess.token);
+        console.warn('logout cleanup failed', String(e));
       }
 
       return res.json({ success: true });
@@ -903,21 +832,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/upload/avatar", async (req, res) => {
     try {
       const sess = await getSessionFromReq(req);
-      // Log auth info for debugging upload failures (server session preferred)
+      // Log auth info for debugging upload failures
       try {
-        console.log('/api/upload/avatar headers:', { authorization: req.headers.authorization });
-        if ((req as any).session && (req as any).session.address) {
-          console.log('/api/upload/avatar server session address:', (req as any).session.address);
-        } else {
-          const authHeader = String(req.headers.authorization || '');
-          const token = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.split(/\s+/)[1] : null;
-          console.log('/api/upload/avatar bearer token present?', !!token, 'sessionsCount=', sessions.size);
-          if (token && sessions.has(token)) {
-            console.log('/api/upload/avatar session for token:', sessions.get(token));
-          }
-        }
+        console.log('/api/upload/avatar auth:', { bearer: !!(req.headers.authorization || ''), hasSession: !!sess?.session });
       } catch (logErr) {
-        console.warn('failed to log upload auth info', logErr);
+        console.warn('failed to log upload auth info', String(logErr));
       }
 
       if (!sess?.session) return res.status(401).json({ error: "not authenticated" });
@@ -961,7 +880,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (s3Err) {
           console.error('S3 upload failed', s3Err);
-          return res.status(500).json({ error: 'failed to upload to object storage', detail: String(s3Err && s3Err.message ? s3Err.message : s3Err) });
+          return res.status(500).json({ error: 'failed to upload to object storage', detail: String(s3Err) });
         }
       } else {
         // Local filesystem fallback (for development only). In production/serverless this should not be used.
@@ -1563,7 +1482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/campaigns/:campaignId/tasks/:taskId/claim", async (req, res) => {
     try {
-      const sess = getSessionFromReq(req);
+      const sess = await getSessionFromReq(req);
       if (!sess?.session) return res.status(401).json({ error: "not authenticated" });
       
       const { campaignId, taskId } = req.params;

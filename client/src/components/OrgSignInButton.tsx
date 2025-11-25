@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useWallet } from "@/hooks/use-wallet";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function OrgSignInButton() {
   const [, setLocation] = useLocation();
@@ -31,8 +32,8 @@ export default function OrgSignInButton() {
       close();
       // After successful wallet connect, ask the server for user+profile
       try {
-        const meRes = await fetch(buildUrl(`/api/me`), { credentials: 'include' });
-        if (meRes.ok) {
+        const meRes = await apiRequest('GET', '/api/me').catch(() => null);
+        if (meRes) {
           const json = await meRes.json().catch(() => ({}));
           // If this wallet owns a project, go directly to that project's dashboard.
           if (json?.hasProject && json?.projectId) {

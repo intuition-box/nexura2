@@ -60,7 +60,7 @@ export default function Quests() {
           if (token) headers['Authorization'] = `Bearer ${token}`;
         } catch (e) { /* ignore localStorage errors */ }
 
-        const res = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers, credentials: 'include' });
+        const res = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers });
         if (!res.ok) return;
         const json = await res.json().catch(() => ({}));
         const serverCompleted: string[] = Array.isArray(json?.completed) ? json.completed : [];
@@ -172,7 +172,7 @@ export default function Quests() {
       const payload = { userId: user.id, quests: quests.map(q => ({ id: q.id, xp: Number(q.xp || (typeof q.reward === 'string' ? (Number((q.reward.match(/(\d+)/) || [0])[0]) || 0) : 0)) })) };
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       try { const token = localStorage.getItem('accessToken'); if (token) headers['Authorization'] = `Bearer ${token}`; } catch(e) {}
-      const resp = await fetch(buildUrl('/api/quests/claimable'), { method: 'POST', headers, credentials: 'include', body: JSON.stringify(payload) });
+      const resp = await fetch(buildUrl('/api/quests/claimable'), { method: 'POST', headers, body: JSON.stringify(payload) });
       if (!resp.ok) {
         console.warn('[Quests] claimable API failed', resp.status);
         return null;
@@ -332,7 +332,6 @@ export default function Quests() {
       const resp = await fetch(buildUrl('/api/xp/add'), {
         method: 'POST',
         headers,
-        credentials: 'include',
         body: JSON.stringify({ userId: user.id, xp: xpAmount, questId: quest.id, questsCompletedDelta, tasksCompletedDelta }),
       });
 
@@ -344,7 +343,7 @@ export default function Quests() {
           const headers2: Record<string, string> = { "Content-Type": "application/json" };
           const token2 = localStorage.getItem('accessToken');
           if (token2) headers2['Authorization'] = `Bearer ${token2}`;
-          const r = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers: headers2, credentials: 'include' });
+          const r = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers: headers2 });
           if (r.ok) {
             const j = await r.json().catch(() => ({}));
             const serverCompleted = Array.isArray(j?.completed) ? j.completed : [];
@@ -372,7 +371,7 @@ export default function Quests() {
         const headers2: Record<string, string> = { "Content-Type": "application/json" };
         const token2 = localStorage.getItem('accessToken');
         if (token2) headers2['Authorization'] = `Bearer ${token2}`;
-        const r = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers: headers2, credentials: 'include' });
+        const r = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers: headers2 });
         if (r.ok) {
           const j = await r.json().catch(() => ({}));
           const serverCompleted = Array.isArray(j?.completed) ? j.completed : [];

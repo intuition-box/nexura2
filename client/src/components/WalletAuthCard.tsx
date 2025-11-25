@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { KeyRound } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { createUserFromWallet, createProjectAccount } from "@/lib/remoteDb";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function WalletAuthCard({ mode = "user", action = "signin" }: { mode?: "user" | "project"; action?: "signin" | "signup" }) {
   const { connectWallet, address, isConnected } = useWallet();
@@ -23,11 +24,10 @@ export default function WalletAuthCard({ mode = "user", action = "signin" }: { m
       // Upsert account depending on mode then navigate appropriately
       if (mode === "user") {
         try {
-          const meRes = await fetch(buildUrl(`/api/me`), { credentials: 'include' });
-          if (meRes.ok) {
+          const meRes = await apiRequest('GET', '/api/me').catch(() => null);
+          if (meRes) {
             const json = await meRes.json().catch(() => ({}));
             if (json?.hasProfile) {
-              // Stay on dashboard instead of redirecting to profile
               window.location.reload();
             } else {
               window.location.href = "/profile/edit";
@@ -47,8 +47,8 @@ export default function WalletAuthCard({ mode = "user", action = "signin" }: { m
           // ignore
         }
         try {
-          const res = await fetch(buildUrl(`/projects`), { credentials: 'include' });
-          if (res.ok) {
+          const res = await apiRequest('GET', '/projects').catch(() => null);
+          if (res) {
             const list = await res.json();
             const my = list.find((p: any) => p.ownerAddress && p.ownerAddress.toLowerCase() === (connectedAddress || "").toLowerCase());
             if (my) {

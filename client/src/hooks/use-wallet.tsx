@@ -113,7 +113,6 @@ export function useWallet() {
         const verifyRes = await fetch(buildUrl('/auth/wallet'), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: 'include',
           body: JSON.stringify({ address, signature, message }),
         });
         if (verifyRes.ok) {
@@ -142,9 +141,9 @@ export function useWallet() {
 
       // subscribe to provider events
       try {
-        eth.on?.("accountsChanged", async (accounts: string[]) => {
+            eth.on?.("accountsChanged", async (accounts: string[]) => {
           if (!accounts || accounts.length === 0) {
-            try { await fetch(buildUrl('/auth/logout'), { method: "POST", credentials: 'include' }); } catch (e) { /* ignore */ }
+            try { await fetch(buildUrl('/auth/logout'), { method: "POST" }); } catch (e) { /* ignore */ }
             try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
             try { emitSessionChange(); } catch (e) { /* ignore */ }
             try { window.location.reload(); } catch (e) { window.location.href = "/"; }
@@ -178,7 +177,7 @@ export function useWallet() {
   }, []);
 
   const disconnect = useCallback(async () => {
-    try { await fetch(buildUrl('/auth/logout'), { method: "POST", credentials: 'include' }); } catch (e) { /* ignore */ }
+    try { await fetch(buildUrl('/auth/logout'), { method: "POST" }); } catch (e) { /* ignore */ }
     try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
     try { emitSessionChange(); } catch (e) { /* ignore */ }
     setState({ isConnected: false, isConnecting: false, address: null, chainId: null });
