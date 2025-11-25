@@ -12,12 +12,12 @@ export async function uploadFile(file: File, folder = "images") {
     const RUNTIME = typeof window !== 'undefined' && (window as any).__BACKEND_URL__;
     const BACKEND_BASE = RUNTIME || ((import.meta as any).env?.VITE_BACKEND_URL as string) || "";
 
-    function buildUrl(path: string) {
+    const buildUrl = (path: string) => {
       if (/^https?:\/\//i.test(path)) return path;
       const base = (BACKEND_BASE || "").replace(/\/+$/g, "");
       const p = path.replace(/^\/+/, "");
       return `${base}/${p}`;
-    }
+    };
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     try {

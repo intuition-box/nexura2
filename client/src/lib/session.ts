@@ -44,6 +44,28 @@ export function clearSession() {
   } catch { /* ignore */ }
 }
 
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('storage', (ev: StorageEvent) => {
+    try {
+      if (ev.key === KEY) {
+        const token = ev.newValue;
+        listeners.forEach((cb) => {
+          try {
+            const res = cb(token);
+            if (res && typeof (res as any).catch === 'function') {
+              (res as Promise<any>).catch((e) => { console.warn('session listener rejected:', e); });
+            }
+          } catch (e) {
+            console.warn('session listener threw:', e);
+          }
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  });
+}
+
 export function onSessionChange(cb: SessionChangeCb) {
   listeners.add(cb);
   return () => { listeners.delete(cb); };
