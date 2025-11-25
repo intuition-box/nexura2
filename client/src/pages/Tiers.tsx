@@ -1,7 +1,26 @@
-import { useState } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { toast } from "@/hooks/use-toast";
+import { TIER_UNLOCK_MIN_LEVEL, TIER_COLORS } from "@shared/schema";
+import AnimatedBackground from "@/components/AnimatedBackground";
+
+// Use Vite env var if provided, otherwise fall back to the deployed backend URL.
+// `import.meta.env` may not be typed in this project, so access defensively.
+// Prefer configured Vite env var; fallback to localhost for dev instead of the deployed Render URL
+// Prefer a runtime-injected backend URL (window.__BACKEND_URL__), then build-time Vite env var,
+// otherwise fall back to localhost for developer convenience.
+const RUNTIME_BACKEND = (typeof window !== 'undefined' && (window as any).__BACKEND_URL__) || undefined;
+const BACKEND_BASE = RUNTIME_BACKEND || ((import.meta as any).env?.VITE_BACKEND_URL as string) || "";
+
+function buildUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = (BACKEND_BASE || "").replace(/\/+$/g, "");
+  const p = path.replace(/^\/+/, "");
+  return `${base}/${p}`;
+}
 
 const TIER_LEVEL_RANGES = {
   enchanter: { min: 0, max: 5 },
@@ -11,19 +30,11 @@ const TIER_LEVEL_RANGES = {
   templar: { min: 50, max: Infinity }
 };
 
-const TIER_COLORS = {
-  enchanter: "#8b5cf6", // purple
-  illuminated: "#10b981", // green
-  conscious: "#3b82f6", // blue
-  oracle: "#8b1538", // wine red
-  templar: "#ef4444" // red
-};
-
 const tierData = [
   {
     key: "enchanter" as const,
     name: "Enchanter",
-    description: "Begin your journey in the NEXURA realm",
+  description: "Begin your journey in the Nexura realm",
     levelRange: "Level 0-5"
   },
   {
@@ -47,32 +58,72 @@ const tierData = [
   {
     key: "templar" as const,
     name: "Templar",
-    description: "The pinnacle of NEXURA mastery",
+  description: "The pinnacle of Nexura mastery",
     levelRange: "Level 50+"
   }
 ];
 
 export default function Tiers() {
-  const [userLevel] = useState(8); // Mock user level
-  
+  const { user } = useAuth();
+  const [ws, setWs] = useState<WebSocket | null>(null);
+
+  useEffect(() => {
+    try {
+      const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host;
+      const socket = new WebSocket(url);
+      socket.onmessage = (ev) => {
+        try {
+          const data = JSON.parse(ev.data);
+          if (data?.type?.startsWith?.('mint:')) {
+            if (data.type === 'mint:completed') {
+              toast({ title: 'Badge minted', description: `Level ${data.level} minted (tx ${data.txHash})` });
+            } else if (data.type === 'mint:started') {
+              toast({ title: 'Mint started', description: `Level ${data.level} mint queued` });
+            } else if (data.type === 'mint:error') {
+              toast({ title: 'Mint error', description: data.error || 'Mint failed' });
+            }
+          }
+        } catch (e) {}
+      };
+      setWs(socket);
+      return () => { try { socket.close(); } catch(e) {} };
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
+  // Only show tiers when we have a server profile
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background overflow-auto p-6">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-4xl font-bold text-foreground">Nexura Tiers</h1>
+          <p className="mt-4 text-muted-foreground">No tier data available.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const userLevel = user.level ?? 0;
   const getUserTier = (level: number) => {
-    if (level >= TIER_LEVEL_RANGES.templar.min) return "templar";
-    if (level >= TIER_LEVEL_RANGES.oracle.min) return "oracle";
-    if (level >= TIER_LEVEL_RANGES.conscious.min) return "conscious";
-    if (level >= TIER_LEVEL_RANGES.illuminated.min) return "illuminated";
+    if (level >= TIER_UNLOCK_MIN_LEVEL.templar) return "templar";
+    if (level >= TIER_UNLOCK_MIN_LEVEL.oracle) return "oracle";
+    if (level >= TIER_UNLOCK_MIN_LEVEL.conscious) return "conscious";
+    if (level >= TIER_UNLOCK_MIN_LEVEL.illuminated) return "illuminated";
     return "enchanter";
   };
 
-  const userTier = getUserTier(userLevel);
+  const userTier = useMemo(() => getUserTier(userLevel), [userLevel]);
 
   return (
-    <div className="min-h-screen bg-background overflow-auto p-6" data-testid="tiers-page">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen bg-black text-white overflow-auto p-6 relative" data-testid="tiers-page">
+      <AnimatedBackground />
+      <div className="max-w-4xl mx-auto space-y-8 relative z-10">
         {/* Header */}
         <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold text-foreground">NEXURA Tiers</h1>
+          <h1 className="text-4xl font-bold text-foreground">Nexura Tiers</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Advance through five distinct tiers of mastery in the NEXURA ecosystem.
+            Advance through five distinct tiers of mastery in the Nexura ecosystem.
           </p>
         </div>
 
@@ -146,6 +197,22 @@ export default function Tiers() {
                           )}
                           {isNextTier && (
                             <Badge className="bg-orange-500 text-white">Next Tier</Badge>
+                          )}
+                          {isUnlocked && (
+                            <button
+                              className="ml-2 inline-flex items-center gap-2 px-3 py-1 bg-indigo-600 text-white rounded text-sm"
+                              onClick={async () => {
+                                try {
+                                  const levelToMint = TIER_LEVEL_RANGES[tier.key].min;
+                                  const res = await fetch(buildUrl('/api/tiers/mint'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, level: levelToMint }) });
+                                  const json = await res.json();
+                                  if (!res.ok) throw new Error(json?.error || 'mint failed');
+                                  toast({ title: 'Mint queued', description: `Job ${json.jobId}` });
+                                } catch (e: any) { toast({ title: 'Mint failed', description: String(e) }); }
+                              }}
+                            >
+                              Mint Badge
+                            </button>
                           )}
                         </div>
                         <p className="text-muted-foreground">{tier.description}</p>

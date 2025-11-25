@@ -1,5 +1,18 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// Prefer a runtime-injected backend URL (window.__BACKEND_URL__), then build-time Vite env var.
+// Do not default to localhost in production — if no backend is configured the app
+// will make requests relative to the current origin.
+const RUNTIME_BACKEND = (typeof window !== 'undefined' && (window as any).__BACKEND_URL__) || undefined;
+const BACKEND_BASE = RUNTIME_BACKEND || ((import.meta as any).env?.VITE_BACKEND_URL as string) || "";
+
+function buildUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = (BACKEND_BASE || "").replace(/\/+$/g, "");
+  const p = path.replace(/^\/+/, "");
+  return `${base}/${p}`;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -7,16 +20,37 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+function getStoredAccessToken() {
+  try {
+    return localStorage.getItem("accessToken");
+  } catch (e) {
+    return null;
+  }
+}
+
+function buildAuthHeaders(extra?: Record<string, string>) {
+  const headers: Record<string, string> = extra ? { ...extra } : {};
+  const token = getStoredAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const fullUrl = buildUrl(url);
+
+  const headers = buildAuthHeaders(data ? { "Content-Type": "application/json" } : {});
+
+  const res = await fetch(fullUrl, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
+    // Allow sending cookies for server-side sessions; server CORS will
+    // only accept credentials in production if FRONTEND_URL is configured.
+    credentials: 'include',
   });
 
   await throwIfResNotOk(res);
@@ -28,9 +62,12 @@ export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
-      credentials: "include",
+  async ({ queryKey }: { queryKey: readonly unknown[] }) => {
+    const path = (queryKey as string[]).join("/");
+    const headers = buildAuthHeaders();
+    const res = await fetch(buildUrl(path), {
+      headers,
+      credentials: 'include',
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
@@ -55,3 +92,5 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+export { buildUrl };

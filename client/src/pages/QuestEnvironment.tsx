@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { apiRequest } from "@/lib/queryClient";
 import { useRoute, Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Clock, Trophy, Target } from "lucide-react";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 export default function QuestEnvironment() {
   const [match, params] = useRoute("/quest/:questId");
@@ -36,61 +38,24 @@ export default function QuestEnvironment() {
 
   useEffect(() => {
     if (params?.questId) {
-      // In a real implementation, this would fetch quest data from API
-      // For now, we'll use mock data based on quest ID
-      const mockQuestData = {
-        "daily-1": {
-          title: "Complete Profile Verification",
-          description: "Connect Discord, connect X, connect email address, and hold a .trust domain",
-          type: "Daily Quest",
-          reward: "0.5 tTRUST",
-          timeLeft: "23h 45m"
-        },
-        "daily-2": {
-          title: "Join Community Discussion",
-          description: "Participate in at least one community discussion",
-          type: "Daily Quest", 
-          reward: "0.5 tTRUST",
-          timeLeft: "23h 45m"
-        },
-        "daily-3": {
-          title: "Share Intuition Project",
-          description: "Share an Intuition project with the community",
-          type: "Daily Quest",
-          reward: "0.5 tTRUST", 
-          timeLeft: "23h 45m"
-        },
-        "weekly-1": {
-          title: "Complete 7-Day Streak",
-          description: "Complete daily quests for 7 consecutive days",
-          type: "Weekly Quest",
-          reward: "3.5 tTRUST",
-          timeLeft: "4d 12h"
-        },
-        "weekly-2": {
-          title: "Refer 3 New Users",
-          description: "Invite 3 friends to join NEXURA",
-          type: "Weekly Quest",
-          reward: "2.0 tTRUST",
-          timeLeft: "4d 12h"
-        },
-        "monthly-1": {
-          title: "Maintain 30-Day Streak",
-          description: "Complete daily quests for 30 consecutive days",
-          type: "Monthly Quest",
-          reward: "15.0 tTRUST",
-          timeLeft: "25d 8h"
-        },
-        "monthly-2": {
-          title: "Community Leader",
-          description: "Be among the top 10 contributors this month",
-          type: "Monthly Quest",
-          reward: "10.0 tTRUST",
-          timeLeft: "25d 8h"
+      // Try fetching quests from the backend and pick the one matching the id.
+      (async () => {
+        try {
+          const res = await apiRequest("GET", "/quests");
+          const json = await res.json();
+          // backend returns { oneTimeQuests, dailyQuests }
+          const candidates: any[] = [
+            ...(json.oneTimeQuests ?? []),
+            ...(json.dailyQuests ?? []),
+          ];
+
+          const found = candidates.find((q: any) => q.id === params.questId || q.questId === params.questId);
+          setQuestData(found ?? null);
+        } catch (e) {
+          console.warn("Could not fetch quest data", e);
+          setQuestData(null);
         }
-      };
-      
-      setQuestData(mockQuestData[params.questId as keyof typeof mockQuestData] || null);
+      })();
     }
   }, [params?.questId]);
 
@@ -99,8 +64,9 @@ export default function QuestEnvironment() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6" data-testid="quest-environment">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen bg-black text-white p-6 relative" data-testid="quest-environment">
+      <AnimatedBackground />
+      <div className="max-w-4xl mx-auto space-y-6 relative z-10">
         {/* Back Button */}
         <div className="flex items-center space-x-4">
           <Button 
@@ -117,22 +83,22 @@ export default function QuestEnvironment() {
         {questData ? (
           <>
             {/* Quest Header */}
-            <Card>
+            <Card className="glass glass-hover rounded-3xl">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="space-y-2">
-                    <div className="text-sm text-muted-foreground">{questData.type}</div>
-                    <CardTitle className="text-2xl">{questData.title}</CardTitle>
-                    <p className="text-muted-foreground">{questData.description}</p>
+                    <div className="text-sm text-white/60">{questData.type}</div>
+                    <CardTitle className="text-2xl text-white">{questData.title}</CardTitle>
+                    <p className="text-white/60">{questData.description}</p>
                   </div>
                   <div className="text-right">
-                    <div className="flex items-center space-x-2 text-sm text-muted-foreground mb-2">
+                    <div className="flex items-center space-x-2 text-sm text-white/60 mb-2">
                       <Clock className="w-4 h-4" />
                       <span>{questData.timeLeft} left</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Trophy className="w-5 h-5 text-yellow-500" />
-                      <span className="font-semibold text-lg">{questData.reward}</span>
+                      <span className="font-bold text-lg text-white">{questData.reward}</span>
                     </div>
                   </div>
                 </div>
@@ -140,13 +106,13 @@ export default function QuestEnvironment() {
             </Card>
 
             {/* Quest Content Area */}
-            <Card className="min-h-[400px]">
+            <Card className="glass glass-hover rounded-3xl min-h-[400px]">
               <CardContent className="p-8">
                 <div className="text-center space-y-6">
-                  <Target className="w-16 h-16 mx-auto text-muted-foreground" />
+                  <Target className="w-16 h-16 mx-auto text-white/60" />
                   <div className="space-y-2">
-                    <h2 className="text-2xl font-bold text-muted-foreground">NOTHING HERE YET</h2>
-                    <p className="text-muted-foreground max-w-md mx-auto">
+                    <h2 className="text-2xl font-bold text-white">NOTHING HERE YET</h2>
+                    <p className="text-white/60 max-w-md mx-auto">
                       Quest content and interactions will be implemented here. 
                       This is where users will complete their quest objectives.
                     </p>
@@ -161,13 +127,13 @@ export default function QuestEnvironment() {
             </Card>
           </>
         ) : (
-          <Card className="min-h-[400px]">
+          <Card className="glass glass-hover rounded-3xl min-h-[400px]">
             <CardContent className="p-8">
               <div className="text-center space-y-6">
-                <Target className="w-16 h-16 mx-auto text-muted-foreground" />
+                <Target className="w-16 h-16 mx-auto text-white/60" />
                 <div className="space-y-2">
-                  <h2 className="text-2xl font-bold text-muted-foreground">QUEST NOT FOUND</h2>
-                  <p className="text-muted-foreground max-w-md mx-auto">
+                  <h2 className="text-2xl font-bold text-white">QUEST NOT FOUND</h2>
+                  <p className="text-white/60 max-w-md mx-auto">
                     The quest you're looking for doesn't exist or has been removed.
                   </p>
                 </div>
