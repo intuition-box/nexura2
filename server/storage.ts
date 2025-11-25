@@ -2,6 +2,7 @@ import { type User, type InsertUser, type ReferralEvent, type InsertReferralEven
 import { randomUUID, createHash } from "crypto";
 import fs from "fs";
 import path from "path";
+import { DATABASE_URL } from "./constants";
 // optional Neon/Postgres-backed storage
 let NeonPool: any = null;
 try {
