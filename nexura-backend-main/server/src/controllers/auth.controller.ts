@@ -111,7 +111,7 @@ export const projectSignUp = async (
 			maxAge: 30 * 24 * 60 * 60,
 		});
 
-		res.status(CREATED).json({ message: "project created!", accessToken });
+		res.status(CREATED).json({ message: "project created!", accessToken, user: projectUser });
 	} catch (error) {
 		logger.error(error);
 		res
