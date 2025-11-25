@@ -1,4 +1,4 @@
-type SessionChangeCb = (token: string | null) => void;
+type SessionChangeCb = (token: string | null) => void | Promise<any>;
 
 const KEY = "accessToken";
 const listeners = new Set<SessionChangeCb>();

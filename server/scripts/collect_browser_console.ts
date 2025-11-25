@@ -38,7 +38,11 @@ async function run() {
   await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
   // Allow time for client-side scripts (wallet injection, auth flows) to run
-  await page.waitForTimeout(5000);
+  if (typeof (page as any).waitForTimeout === 'function') {
+    await (page as any).waitForTimeout(5000);
+  } else {
+    await new Promise((r) => setTimeout(r, 5000));
+  }
 
   // If there's a global window.__BACKEND_URL__ print it
   try {

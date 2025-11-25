@@ -1,19 +1,28 @@
 import { type User, type InsertUser, type ReferralEvent, type InsertReferralEvent, type ReferralClaim, type InsertReferralClaim, type ReferralStats } from "@shared/schema";
-import { randomUUID, createHash } from "crypto";
+import { randomUUID, createHash, randomBytes } from "crypto";
+import { createRequire } from 'module';
 import fs from "fs";
 import path from "path";
-// (DATABASE_URL from process.env)
 // optional Neon/Postgres-backed storage
 let NeonPool: any = null;
 try {
   // lazy import so local dev without the env doesn't crash
   // @neondatabase/serverless provides a createPool compatible API
-  // Use CONFIG.DATABASE_URL instead of process.env
-  const dbUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || undefined;
-  if (dbUrl) {
-    const mod2 = await import("@neondatabase/serverless");
-    const createPool = (mod2 as any).createPool;
-    NeonPool = createPool(dbUrl);
+  if (process.env.DATABASE_URL) {
+    try {
+      const req = createRequire(import.meta.url);
+      try {
+        const mod = req('@neondatabase/serverless');
+        const createPool = (mod as any).createPool || (mod as any).default?.createPool;
+        if (typeof createPool === 'function') {
+          NeonPool = createPool(process.env.DATABASE_URL);
+        }
+      } catch (e) {
+        // ignore - optional dependency not present
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 } catch (e) {
   // ignore - dependency may not be available in some envs
@@ -211,6 +220,112 @@ export class MemStorage implements IStorage {
     }
   }
 
+  // Fallback query runner for MemStorage (no-op). NeonStorage overrides this.
+  protected async query(sql: string, params: any[] = []): Promise<any> {
+    // MemStorage doesn't have a DB pool; return empty result for any schema checks.
+    return { rows: [] };
+  }
+
+  // Helpers for per-user and per-project table names and creation (best-effort)
+  protected sanitizeName(s: string) {
+    return (s || '').toString().replace(/[^a-z0-9_]/gi, '_').toLowerCase();
+  }
+
+  protected getUserProfileTableName(userId: string) {
+    return `user_profiles_${this.sanitizeName(userId)}`;
+  }
+
+  protected async ensureUserProfileTable(userId: string) {
+    const tbl = this.getUserProfileTableName(userId);
+    const createSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR(128),
+      display_name TEXT,
+      avatar TEXT,
+      social_profiles JSONB DEFAULT '{}'::jsonb,
+      xp INT DEFAULT 0,
+      level INT DEFAULT 0,
+      quests_completed INT DEFAULT 0,
+      tasks_completed INT DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      updated_at TIMESTAMPTZ DEFAULT now()
+    );`;
+    try {
+      await this.query(createSql);
+    } catch (e) {
+      // best-effort
+    }
+  }
+
+  protected getUserLevelNftsTableName(userId: string) {
+    return `user_level_nfts_${this.sanitizeName(userId)}`;
+  }
+
+  protected async ensureUserLevelNftsTable(userId: string) {
+    const tbl = this.getUserLevelNftsTableName(userId);
+    const createSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR(128),
+      level INT,
+      token_id VARCHAR(255),
+      tx_hash VARCHAR(255),
+      meta JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );`;
+    try { await this.query(createSql); } catch (e) {}
+  }
+
+  protected getUserOauthTableName(userId: string) {
+    return `user_oauth_tokens_${this.sanitizeName(userId)}`;
+  }
+
+  protected async ensureUserOauthTable(userId: string) {
+    const tbl = this.getUserOauthTableName(userId);
+    const createSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR(128),
+      provider VARCHAR(128),
+      access_token TEXT,
+      refresh_token TEXT,
+      expires_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );`;
+    try { await this.query(createSql); } catch (e) {}
+  }
+
+  protected getProjectCampaignTasksTableName(projectId: string) {
+    return `project_${this.sanitizeName(projectId)}_campaign_tasks`;
+  }
+
+  protected async ensureProjectCampaignTasksTable(projectId: string) {
+    const tbl = this.getProjectCampaignTasksTableName(projectId);
+    const createSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+      id VARCHAR(128) PRIMARY KEY,
+      project_id VARCHAR(128),
+      campaign_id VARCHAR(128),
+      title TEXT,
+      description TEXT,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );`;
+    try { await this.query(createSql); } catch (e) {}
+  }
+
+  protected getProjectCampaignTaskCompletionsTableName(projectId: string) {
+    return `project_${this.sanitizeName(projectId)}_campaign_task_completions`;
+  }
+
+  protected async ensureProjectCampaignTaskCompletionsTable(projectId: string) {
+    const tbl = this.getProjectCampaignTaskCompletionsTableName(projectId);
+    const createSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+      user_id VARCHAR(128),
+      task_id VARCHAR(128),
+      completed_at TIMESTAMPTZ DEFAULT now(),
+      PRIMARY KEY (user_id, task_id)
+    );`;
+    try { await this.query(createSql); } catch (e) {}
+  }
+
   private seedQuests() {
     try {
       // Minimal set of quests for local dev that mirrors the client lists
@@ -228,7 +343,7 @@ export class MemStorage implements IStorage {
   }
 
   async createSessionToken(userId: string, address?: string) {
-    const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomBytes(8).toString('hex');
+    const token = randomUUID().replace(/-/g, '') + randomBytes(8).toString('hex');
     this.sessionTokens.set(token, { userId, address: address || '', createdAt: new Date().toISOString() });
     return token;
   }
@@ -761,12 +876,12 @@ export class MemStorage implements IStorage {
  * Neon-backed storage implementation using raw SQL via @neondatabase/serverless.
  * Falls back gracefully to MemStorage when no DATABASE_URL or pool is unavailable.
  */
-class NeonStorage implements IStorage {
+class NeonStorage extends MemStorage implements IStorage {
   private pool: any;
   constructor(pool: any) {
+    super();
     this.pool = pool;
   }
-
   // Session token helpers: implement DB-backed session tokens so production
   // mode (NODE_ENV=production) can validate bearer tokens when NeonStorage
   // is used. These mirror the in-memory MemStorage behavior but persist to
@@ -790,9 +905,9 @@ class NeonStorage implements IStorage {
   }
 
   // Create and persist a new session token
-  async createSessionToken(userId: string, address: string | null) {
+  async createSessionToken(userId: string, address?: string | null): Promise<string> {
     await this.ensureSessionTokensTable();
-    const token = require("crypto").randomBytes(32).toString("hex");
+    const token = randomBytes(32).toString("hex");
     try {
       const r = await this.query(
         `INSERT INTO user_session_tokens (token, user_id, address, created_at) VALUES ($1,$2,$3,now()) RETURNING token, created_at`,
@@ -829,7 +944,7 @@ class NeonStorage implements IStorage {
     }
   }
 
-  private async query(sql: string, params: any[] = []) {
+  protected async query(sql: string, params: any[] = []) {
     return this.pool.query(sql, params);
   }
 
@@ -1531,6 +1646,4 @@ if (NeonPool) {
 }
 
 export const storage = storageInstance;
-
-
 

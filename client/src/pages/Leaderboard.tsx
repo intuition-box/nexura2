@@ -21,6 +21,7 @@ function buildUrl(path: string) {
 type Entry = {
   id: string;
   username: string;
+  avatar?: string;
   display_name?: string;
   address?: string;
   xp: number;
