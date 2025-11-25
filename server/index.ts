@@ -1,8 +1,8 @@
- 
+import dotenv from "dotenv";
 import { createRequire } from 'module';
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
-import { DATABASE_URL, DEBUG_SESSION_SECRET } from "./constants";
+try { dotenv.config({ path: path.resolve(process.cwd(), ".env.local") }); } catch {}
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 

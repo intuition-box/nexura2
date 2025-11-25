@@ -2,7 +2,6 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertReferralEventSchema, insertReferralClaimSchema } from "@shared/schema";
-import { DEBUG_SESSION_SECRET } from "./constants";
 import crypto from "crypto";
 import { verifyMessage } from "ethers";
 import fs from "fs";
@@ -43,7 +42,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Debug endpoint to inspect incoming headers and session-like info.
   app.get('/api/debug-session', (req, res) => {
-    const secret = DEBUG_SESSION_SECRET || null;
+    const secret = process.env.DEBUG_SESSION_SECRET || null;
     if (!secret) return res.status(404).json({ error: 'not available' });
     const provided = String(req.get('x-debug-secret') || '');
     if (provided !== secret) return res.status(403).json({ error: 'forbidden' });
@@ -166,7 +165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dev/Admin: export current in-memory legacy sessions (for migration)
   app.get('/__admin/export-sessions', async (req, res) => {
     try {
-      const secret = DEBUG_SESSION_SECRET || null;
+      const secret = process.env.DEBUG_SESSION_SECRET || null;
       const provided = String(req.get('x-debug-secret') || '');
       if (!secret) return res.status(404).json({ error: 'not available' });
       if (provided !== secret) return res.status(403).json({ error: 'forbidden' });
@@ -184,7 +183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dev/Admin: migrate in-memory legacy sessions into DB-backed user_session_tokens
   app.post('/__admin/migrate-sessions', async (req, res) => {
     try {
-      const secret = DEBUG_SESSION_SECRET || null;
+      const secret = process.env.DEBUG_SESSION_SECRET || null;
       const provided = String(req.get('x-debug-secret') || '');
       if (!secret) return res.status(404).json({ error: 'not available' });
       if (provided !== secret) return res.status(403).json({ error: 'forbidden' });
@@ -404,7 +403,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const auth = String(req.headers.authorization || "").trim();
       // DEBUG: log presence of Authorization header if DEBUG_SESSION_SECRET is set
       try {
-        const debugSecret = DEBUG_SESSION_SECRET;
+        const debugSecret = process.env.DEBUG_SESSION_SECRET;
         if (debugSecret) {
           const hasAuth = !!auth;
           const redacted = auth && auth.split(/\s+/)[1] ? ((auth.split(/\s+/)[1] as string).slice(0,4) + '...' + (auth.split(/\s+/)[1] as string).slice(-4)) : null;
@@ -422,7 +421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const dbSess = await (storage as any).getSessionByToken(token);
           // DEBUG: log if DB session found
           try {
-            const debugSecret = DEBUG_SESSION_SECRET;
+            const debugSecret = process.env.DEBUG_SESSION_SECRET;
             if (debugSecret) {
               console.log('getSessionFromReq debug: dbSess found?', !!dbSess);
             }

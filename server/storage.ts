@@ -2,19 +2,18 @@ import { type User, type InsertUser, type ReferralEvent, type InsertReferralEven
 import { randomUUID, createHash } from "crypto";
 import fs from "fs";
 import path from "path";
-import { DATABASE_URL } from "./constants";
+// (DATABASE_URL from process.env)
 // optional Neon/Postgres-backed storage
 let NeonPool: any = null;
 try {
   // lazy import so local dev without the env doesn't crash
   // @neondatabase/serverless provides a createPool compatible API
   // Use CONFIG.DATABASE_URL instead of process.env
-  const mod = await import("./config");
-  const cfg = (mod as any).CONFIG || (mod as any).default;
-  if (cfg && cfg.DATABASE_URL) {
+  const dbUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || undefined;
+  if (dbUrl) {
     const mod2 = await import("@neondatabase/serverless");
     const createPool = (mod2 as any).createPool;
-    NeonPool = createPool(cfg.DATABASE_URL);
+    NeonPool = createPool(dbUrl);
   }
 } catch (e) {
   // ignore - dependency may not be available in some envs
@@ -1532,4 +1531,6 @@ if (NeonPool) {
 }
 
 export const storage = storageInstance;
+
+
 

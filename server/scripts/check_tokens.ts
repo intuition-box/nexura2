@@ -2,7 +2,7 @@
 // Simple script to query user_session_tokens table in Neon/Postgres
 (async function(){
   try {
-    const DATABASE_URL = "postgresql://neondb_owner:npg_g4BOXLHIw9uv@ep-super-dawn-ahjzzy2h-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+    const DATABASE_URL = process.env.DATABASE_URL || process.argv[2];
     if(!DATABASE_URL){
       console.error('DATABASE_URL not provided via env or arg');
       process.exit(2);

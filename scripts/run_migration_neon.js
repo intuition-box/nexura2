@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 async function run() {
-  const DATABASE_URL = "postgresql://neondb_owner:npg_g4BOXLHIw9uv@ep-super-dawn-ahjzzy2h-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+  const DATABASE_URL = process.env.DATABASE_URL;
   if (!DATABASE_URL) {
     console.error('Please set DATABASE_URL env var to your Neon/Postgres connection string');
     process.exit(1);
