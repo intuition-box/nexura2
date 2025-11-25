@@ -248,15 +248,5 @@ export async function seedTasks() {
   console.log('Task seeding complete!');
 }
 
-// Run if executed directly
-if (require.main === module) {
-  seedTasks()
-    .then(() => {
-      console.log('Done!');
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('Seeding failed:', error);
-      process.exit(1);
-    });
-}
+// Note: seeding is invoked from server/index.ts in development. Do not run this file
+// directly in ESM environments.

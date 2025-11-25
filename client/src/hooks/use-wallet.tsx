@@ -109,24 +109,22 @@ export function useWallet() {
       // Try backend auth but don't fail if it's not available
       let shouldReload = !opts?.noReload;
       try {
-        console.log("🔐 Attempting backend authentication...");
-        const verifyRes = await fetch(buildUrl('/auth/wallet'), {
+        console.log("🔒 Attempting backend authentication (simple)...");
+        const verifyRes = await fetch(buildUrl('/auth/simple'), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ address, signature, message }),
         });
         if (verifyRes.ok) {
           const json = await verifyRes.json().catch(() => ({}));
-          if (json?.accessToken) setSessionToken(json.accessToken);
+          try { if (json?.user) localStorage.setItem('nexura:user', JSON.stringify(json.user)); } catch (e) { /* ignore */ }
           try { emitSessionChange(); } catch (e) { /* ignore */ }
-          console.log("✅ Backend authentication successful");
+          console.log("✔ Backend authentication (simple) successful");
         } else {
-          // Backend auth failed but wallet is still connected locally
-          console.warn("⚠️ Backend auth failed, wallet connected locally only");
+          console.warn("⚠ Backend simple auth failed, wallet connected locally only");
         }
       } catch (e) {
-        // Backend not available - this is OK on Netlify frontend-only deployment
-        console.warn("⚠️ Backend verification not available (frontend-only mode)");
+        console.warn("⚠ Backend verification not available (frontend-only mode)");
       }
 
       // Reload page to update UI with connected wallet state

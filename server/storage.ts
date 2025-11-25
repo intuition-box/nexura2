@@ -1,15 +1,15 @@
 import { type User, type InsertUser, type ReferralEvent, type InsertReferralEvent, type ReferralClaim, type InsertReferralClaim, type ReferralStats } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 import fs from "fs";
 import path from "path";
 // optional Neon/Postgres-backed storage
 let NeonPool: any = null;
 try {
-  // lazy require so local dev without the env doesn't crash
+  // lazy import so local dev without the env doesn't crash
   // @neondatabase/serverless provides a createPool compatible API
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { createPool } = require("@neondatabase/serverless");
   if (process.env.DATABASE_URL) {
+    const mod = await import("@neondatabase/serverless");
+    const createPool = (mod as any).createPool;
     NeonPool = createPool(process.env.DATABASE_URL);
   }
 } catch (e) {
@@ -756,35 +756,10 @@ class NeonStorage implements IStorage {
     this.pool = pool;
   }
 
-  // Session token helpers: store tokens in `user_session_tokens`.
-  private async ensureSessionTokensTable() {
-    try {
-      await this.query(`CREATE TABLE IF NOT EXISTS user_session_tokens (token varchar PRIMARY KEY, user_id varchar, address varchar, created_at timestamptz DEFAULT now())`);
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  async createSessionToken(userId: string, address?: string) {
-    await this.ensureSessionTokensTable();
-    // generate a random token
-    const token = crypto.randomBytes(32).toString('hex');
-    await this.query(`insert into user_session_tokens (token, user_id, address, created_at) values ($1,$2,$3,now())`, [token, userId, address || null]);
-    return token;
-  }
-
-  async getSessionByToken(token: string) {
-    await this.ensureSessionTokensTable();
-    const r = await this.query(`select user_id, address, created_at from user_session_tokens where token = $1 limit 1`, [token]);
-    if (!r || !r.rows || r.rows.length === 0) return undefined;
-    const row = r.rows[0];
-    return { userId: row.user_id || null, address: row.address || null, createdAt: row.created_at };
-  }
-
-  async deleteSessionToken(token: string) {
-    await this.ensureSessionTokensTable();
-    await this.query(`delete from user_session_tokens where token = $1`, [token]);
-  }
+  // Session token helpers removed: this simplified build uses signature-based
+  // authentication (see /auth/simple) and does not create or manage bearer
+  // tokens in the database. If you need persistent session tokens, implement
+  // them explicitly in a separate branch or add-on.
 
   private async query(sql: string, params: any[] = []) {
     return this.pool.query(sql, params);
@@ -946,7 +921,7 @@ class NeonStorage implements IStorage {
 
   // Helper: sanitized per-user quest table name (based on sha256 of userId)
   private getUserQuestTableName(userId: string) {
-    const hash = require('crypto').createHash('sha256').update(String(userId)).digest('hex').slice(0, 12);
+    const hash = createHash('sha256').update(String(userId)).digest('hex').slice(0, 12);
     return `user_quest_completions_u_${hash}`;
   }
 
@@ -1482,3 +1457,4 @@ if (NeonPool) {
 }
 
 export const storage = storageInstance;
+
