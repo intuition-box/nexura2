@@ -1,8 +1,9 @@
-import dotenv from "dotenv";
+// Load environment variables as early as possible.
+// Use DOTENV_CONFIG_PATH to point to a specific file (e.g. .env.local) when running locally.
+import 'dotenv/config';
 import { createRequire } from 'module';
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
-try { dotenv.config({ path: path.resolve(process.cwd(), ".env.local") }); } catch {}
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
