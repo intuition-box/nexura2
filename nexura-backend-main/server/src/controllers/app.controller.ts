@@ -14,7 +14,7 @@ export const updateUsername = async (req: GlobalRequest, res: GlobalResponse) =>
 
     if (!userToUpdate) {
       res.status(BAD_REQUEST).json({ error: "invalid user id" });
-			return;
+      return;
     }
 
     userToUpdate.username = username;
@@ -25,7 +25,26 @@ export const updateUsername = async (req: GlobalRequest, res: GlobalResponse) =>
     logger.error(error);
     res.status(INTERNAL_SERVER_ERROR).json({ error: "error updating username" });
   }
-}
+};
+
+export const getLeaderboard = async (req: GlobalRequest, res: GlobalResponse) => {
+  try {
+    const userData = await user.find();
+
+    const leaderboardByXp = userData.sort((a, b) => b.xp - a.xp).slice(0, 20);
+    const leaderboardByTrustTokens = userData.sort((a, b) => b.tTrustEarned - a.tTrustEarned).slice(0, 20);
+
+    const leaderboardInfo = {
+      leaderboardByXp,
+      leaderboardByTrustTokens
+    }
+
+    res.status(OK).json({ message: "leaderboard info fetched", leaderboardInfo });
+  } catch(error) {
+    logger.error(error);
+    res.status(INTERNAL_SERVER_ERROR).json({ error: "error fetching leaderboard data" })
+  }
+};
 
 export const fetchUser = async (req: GlobalRequest, res: GlobalResponse) => {
   try {
