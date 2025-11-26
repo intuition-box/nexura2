@@ -21,7 +21,9 @@ export const fetchEcosystemDapps = async (req: GlobalRequest, res: GlobalRespons
 
 export const fetchQuests = async (req: GlobalRequest, res: GlobalResponse) => {
 	try {
-		const oneTimeQuestsInDB = await quest.find({ category: "one-time" });
+		const allQuests = await quest.find();
+
+		const oneTimeQuestsInDB = await allQuests.filter((quest) => quest.category === "one-time");
 
 		const oneTimeQuestsCompleted = await questCompleted.find({ user: req.id });
 
@@ -43,7 +45,26 @@ export const fetchQuests = async (req: GlobalRequest, res: GlobalResponse) => {
 			oneTimeQuests.push(mergedQuest);
 		} 
 
-		const dailyQuests = await quest.find({ category: "daily" });
+		const dailyQuestsInDB = allQuests.filter((quest) => quest.category === "daily");
+		const dailyQuestsCompleted = await questCompleted.find({ user: req.id });
+
+		const dailyQuests: any[] = [];
+
+		for (const dailyQuest of dailyQuestsInDB) {
+			const dailyQuestCompleted = dailyQuestsCompleted.find(
+				(completedQuest) => completedQuest.user === dailyQuest._id
+			);
+
+			const mergedQuest: Record<string, unknown> = { ...dailyQuest };
+
+			if (dailyQuestCompleted) {
+				mergedQuest.done = dailyQuestCompleted.done;
+			} else {
+				mergedQuest.done = false;
+			}
+
+			dailyQuests.push(mergedQuest);
+		}
 
 		res.status(OK).json({ message: "quests fetched!", oneTimeQuests, dailyQuests });
 	} catch (error) {
@@ -175,94 +196,52 @@ export const performCampaignTask = async (req: GlobalRequest, res: GlobalRespons
 	}
 }
 
-interface DailyQuests {
-	[key: string]: boolean;
-}
-
-export const claimDailyQuest = async (req: GlobalRequest, res: GlobalResponse) => {
+export const claimQuest = async (req: GlobalRequest, res: GlobalResponse) => {
 	try {
-		const { taskNumber, xp }: { taskNumber: string, xp: number } = req.body;
+		const id = req.query.id as string;
 
-		if (!taskNumber || !xp) {
-			res.status(BAD_REQUEST).json({ error: "send the required data - xp and task number" });
-			return;
-		}
-
-		if (!["task1", "task2", "task3", "task4"].includes(taskNumber)) {
-			res.status(FORBIDDEN).json({ error: "only tasks 1-4 are allowed" });
-			return;
-		}
-
-		const dailyQuestUser = await user.findOne({ id: req.id });
-		if (!dailyQuestUser) {
-			res.status(BAD_REQUEST).json({ error: "send the required data" });
-			return;
-		}
-
-		if (dailyQuestUser.dailyTasks?.done === true) {
-			res.status(FORBIDDEN).json({ error: "daily tasks completed for the day" });
-			return;
-		}
-
-		const taskDone = (dailyQuestUser.dailyTasks as DailyQuests)[taskNumber];
-
-		if (taskDone) {
-			res.status(FORBIDDEN).json({ error: "already performed this task" });
-			return;
-		}
-
-		(dailyQuestUser.dailyTasks as DailyQuests)[taskNumber] = true;
-
-		dailyQuestUser.questsCompleted += 1;
-
-		dailyQuestUser.xp += xp;
-
-		if (taskNumber === "task4") {
-			dailyQuestUser.dailyTasks!.done = true;
-		}
-
-		await dailyQuestUser.save();
-
-		res.status(OK).json({ message: "daily quest done!" });
-	} catch (error) {
-		logger.error(error);
-		res.status(INTERNAL_SERVER_ERROR).json({ error: "error claiming daily quest" });
-	}
-}
-
-export const claimOneTimeQuest = async (req: GlobalRequest, res: GlobalResponse) => {
-	try {
-		const { id, xp }: { id: string, xp: number } = req.body;
-
-		if (!id || !xp) {
-			res.status(BAD_REQUEST).json({ error: "send required data" });
+		if (!id) {
+			res.status(BAD_REQUEST).json({ error: "send quest id" });
 			return;
 		}
 
 		const questFound = await quest.findById(id);
 		if (!questFound) {
-			res.status(NOT_FOUND).json({ error: "id associated with quest is invalid" });
+			res
+				.status(NOT_FOUND)
+				.json({ error: "id associated with quest is invalid" });
 			return;
 		}
 
-		const oneTimeQuestUser = await user.findById(req.id);
-		if (!oneTimeQuestUser) {
+		const questUser = await user.findById(req.id);
+		if (!questUser) {
 			res.status(NOT_FOUND).json({ error: "invalid user" });
 			return;
 		}
 
-		oneTimeQuestUser.questsCompleted += 1;
+		questUser.questsCompleted += 1;
 
-		oneTimeQuestUser.xp += questFound.reward?.xp as number;
+		questUser.xp += questFound.reward?.xp as number;
 
-		oneTimeQuestUser.tTrustEarned += questFound.reward?.tTrust as number;
+		questUser.tTrustEarned += questFound.reward?.tTrust ?? 0;
 
-		await questCompleted.create({ done: true, quest: id, user: oneTimeQuestUser._id });
+		const category = questFound.category;
+		if (category != "one-time") {
+			await questCompleted.create({
+				done: true,
+				quest: id,
+				user: questUser._id,
+				category,
+				expiresAt: new Date(new Date().getTime() + 24 * 60 * 60 * 1000)
+			});
+		} else {
+			await questCompleted.create({ done: true, quest: id, user: questUser._id, category });
+		}
 
-		res.status(OK).json({ message: "one time quest done!" });
+		res.status(OK).json({ message: "quest done!" });
 	} catch (error) {
 		logger.error(error);
-		res.status(INTERNAL_SERVER_ERROR).json({ error: "error claim one time quest" });
+		res.status(INTERNAL_SERVER_ERROR).json({ error: "error claiming quest" });
 	}
 }
 
