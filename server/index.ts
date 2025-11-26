@@ -6,6 +6,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import * as logger from './logger'
 
 const app = express();
 app.use(express.json());
@@ -37,7 +38,7 @@ app.use((req, res, next) => {
         logLine = logLine.slice(0, 79) + "…";
       }
 
-      log(logLine);
+      logger.info(logLine, { method: req.method, path, status: res.statusCode, duration })
     }
   });
 
@@ -58,9 +59,9 @@ app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
       try {
         const { seedTasks } = await import("./seedTasks");
         await seedTasks();
-        log("✔ Tasks seeded successfully");
+          logger.info("Tasks seeded successfully");
       } catch (error) {
-        log("✖ Failed to seed tasks: " + String(error));
+          logger.error("Failed to seed tasks: " + String(error));
       }
     }
 
@@ -69,7 +70,7 @@ app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
       const message = err.message || "Internal Server Error";
 
       res.status(status).json({ message });
-      console.error('Express error handler:', err);
+        logger.error('Express error handler', { err: String(err) });
     });
 
     // Setup vite in development
@@ -89,9 +90,9 @@ app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
     }
 
     server.listen(listenOptions, () => {
-      log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode`);
-      log(`🌐 Listening on ${host}:${port}`);
-      log(`📊 Health check: http://${host === "0.0.0.0" ? "localhost" : host}:${port}/health`);
+      logger.info(`Server running in ${process.env.NODE_ENV || 'development'} mode`);
+      logger.info(`Listening on ${host}:${port}`);
+      logger.info(`Health check: http://${host === "0.0.0.0" ? "localhost" : host}:${port}/health`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
