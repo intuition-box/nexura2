@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { apiRequest } from "./queryClient";
+import { apiRequest, apiRequestV2 } from "./queryClient";
 import { setSessionToken, clearSession, getSessionToken, onSessionChange, emitSessionChange } from "./session";
 import { toast } from "@/hooks/use-toast";
 
@@ -146,14 +146,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const accessToken = json?.accessToken;
     if (accessToken) {
       try {
-        setSessionToken(accessToken);
+        localStorage.setItem("accessToken", accessToken);
       } catch (e) {
         console.warn("failed to persist token", e);
       }
 
       // fetch profile
       try {
-        const p = await apiRequest("GET", "/profile");
+        const p = await apiRequestV2("GET", "/api/profile");
         const pj = await p.json();
         setUser(pj?.user ?? pj);
       } catch (e) {
