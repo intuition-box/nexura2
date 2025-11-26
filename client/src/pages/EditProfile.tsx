@@ -37,7 +37,7 @@ export default function EditProfile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  
+
   const [profileData, setProfileData] = useState({
     displayName: user?.displayName || user?.username || "User",
     socialProfiles: {

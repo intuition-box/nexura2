@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Calendar, Clock, Trophy, Target, CheckCircle, Plus, ArrowRight } from "lucide-react";
 import { useLocation } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiRequestV2 } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { emitSessionChange } from "@/lib/session";
@@ -114,13 +114,36 @@ export default function Quests() {
     { id: 'camp-support-claim', title: 'Support the Nexura Claim', description: 'Support the nexura claim on Intuition', xp: 50, reward: '50 XP', kind: 'campaign', url: 'https://testnet.portal.intuition.systems/explore/atom/0x985db42765efe28ba3ed6867fa7bd913955227898f6a665e34e3c9171885f1cc', actionLabel: 'Open Claim', isActive: 1 },
   ];
 
+  type Quest = {
+    _id: string;
+    title: string;
+    description: string;
+    reward: {
+      xp: number;
+      // trust: number;
+    };
+    url: string;
+    done: boolean;
+  };
+
+  const [dailyQuestTasks, setDailyQuestData] = useState<Quest[]>([]);
+  const [oneTimeQuests, setOneTimeQuestData] = useState<Quest[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const questResponse = await apiRequestV2("GET", "/api/quests");
+      setDailyQuestData(questResponse.dailyQuests);
+      setOneTimeQuestData(questResponse.oneTimeQuests);
+    })();
+  }, []);
+
   // Use hardcoded quests as the UI source of truth (do not fetch /api/quests)
   const [quests] = useState<any[]>(DEFAULT_QUESTS);
 
   // Group quests by kind for the UI
   const featuredQuests = quests.filter(q => q.kind === 'featured');
-  const dailyQuestTasks = quests.filter(q => q.kind === 'daily');
-  const oneTimeQuests = quests.filter(q => ['one-time','onetime','one_time','external','connect-x','connect-discord'].includes(q.kind));
+  // const dailyQuestTasks = quests.filter(q => q.kind === 'daily');
+  // const oneTimeQuests = quests.filter(q => ['one-time','onetime','one_time','external','connect-x','connect-discord'].includes(q.kind));
   const campaignTasks = quests.filter(q => ['campaign','campaign-task','campaign_task'].includes(q.kind));
   const extraQuests = quests.filter(q => !['featured','daily','one-time','onetime','one_time','external','campaign','campaign-task','campaign_task','connect-x','connect-discord'].includes(q.kind));
 
@@ -226,7 +249,7 @@ export default function Quests() {
   const renderActionForQuest = (q: any) => {
     const label = q.actionLabel || 'Open';
     // External link -> anchor
-    if (q.kind === 'external' && q.url) {
+    if (q.url) {
       return (
         <a
           href={q.url}
@@ -274,12 +297,12 @@ export default function Quests() {
   };
 
   // Claim a quest/task locally and, if the user is signed in, persist XP to the backend
-  const claimAndAwardXp = async (quest: any) => {
-    if (!quest || !quest.id) return;
+  const claimAndAwardXp = async (questId: string) => {
+    if (!questId) return;
     
     // Check if already claimed
-    if (claimedTasks.includes(quest.id)) {
-      console.log('[Quests] Quest already claimed:', quest.id);
+    if (claimedTasks.includes(questId)) {
+      console.log('[Quests] Quest already claimed:', questId);
       toast({
         title: 'Already claimed',
         description: 'You have already claimed this quest.',
@@ -289,15 +312,15 @@ export default function Quests() {
     }
 
     // determine xp amount
-    let xpAmount = 0;
-    if (typeof quest.xp === 'number') xpAmount = quest.xp;
-    else if (typeof quest.reward === 'string') {
-      const m = quest.reward.match(/(\d+)\s*XP/i);
-      if (m) xpAmount = Number(m[1]);
-    }
+    // let xpAmount = 0;
+    // if (typeof quest.xp === 'number') xpAmount = quest.xp;
+    // else if (typeof quest.reward === 'string') {
+    //   const m = quest.reward.match(/(\d+)\s*XP/i);
+    //   if (m) xpAmount = Number(m[1]);
+    // }
 
-    const questsCompletedDelta = Number(quest.metrics?.quests ?? 0);
-    const tasksCompletedDelta = Number(quest.metrics?.tasks ?? 0);
+    // const questsCompletedDelta = Number(quest.metrics?.quests ?? 0);
+    // const tasksCompletedDelta = Number(quest.metrics?.tasks ?? 0);
 
     if (!user || !user.id) {
       console.error('[Quests] No user ID available');
@@ -309,18 +332,18 @@ export default function Quests() {
       return;
     }
 
-    if (xpAmount <= 0) {
-      console.warn('[Quests] Invalid XP amount:', xpAmount);
-      toast({
-        title: 'Error',
-        description: 'Invalid quest reward.',
-        variant: 'destructive'
-      });
-      return;
-    }
+    // if (xpAmount <= 0) {
+    //   console.warn('[Quests] Invalid XP amount:', xpAmount);
+    //   toast({
+    //     title: 'Error',
+    //     description: 'Invalid quest reward.',
+    //     variant: 'destructive'
+    //   });
+    //   return;
+    // }
 
     try {
-      console.log('[Quests] Awarding XP:', { userId: user.id, xp: xpAmount, questId: quest.id });
+      console.log('[Quests] Awarding XP:', { userId: user.id, questId });
 
       // Build headers with bearer token
       const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -329,34 +352,33 @@ export default function Quests() {
         if (token) headers['Authorization'] = `Bearer ${token}`;
       } catch (e) { /* ignore */ }
 
-      const resp = await fetch(buildUrl('/api/xp/add'), {
+      const resp = await fetch(buildUrl(`/api/user/claim-quest?id=${questId}`), {
         method: 'POST',
         headers,
-        body: JSON.stringify({ userId: user.id, xp: xpAmount, questId: quest.id, questsCompletedDelta, tasksCompletedDelta }),
       });
 
-      if (resp.status === 409) {
-        // Quest already completed on server
-        console.warn('[Quests] Quest already completed on server:', quest.id);
-        // Sync claimedTasks from server
-        try {
-          const headers2: Record<string, string> = { "Content-Type": "application/json" };
-          const token2 = localStorage.getItem('accessToken');
-          if (token2) headers2['Authorization'] = `Bearer ${token2}`;
-          const r = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers: headers2 });
-          if (r.ok) {
-            const j = await r.json().catch(() => ({}));
-            const serverCompleted = Array.isArray(j?.completed) ? j.completed : [];
-            setClaimedTasks(serverCompleted);
-          } else {
-            handleClaimTask(quest.id);
-          }
-        } catch (e) {
-          handleClaimTask(quest.id);
-        }
-        toast({ title: 'Already claimed', description: 'You have already claimed this quest.', variant: 'destructive' });
-        return;
-      }
+      // if (resp.status === 409) {
+      //   // Quest already completed on server
+      //   console.warn('[Quests] Quest already completed on server:', quest._id);
+      //   // Sync claimedTasks from server
+      //   try {
+      //     const headers2: Record<string, string> = { "Content-Type": "application/json" };
+      //     const token2 = localStorage.getItem('accessToken');
+      //     if (token2) headers2['Authorization'] = `Bearer ${token2}`;
+      //     const r = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers: headers2 });
+      //     if (r.ok) {
+      //       const j = await r.json().catch(() => ({}));
+      //       const serverCompleted = Array.isArray(j?.completed) ? j.completed : [];
+      //       setClaimedTasks(serverCompleted);
+      //     } else {
+            handleClaimTask(questId);
+      //     }
+      //   } catch (e) {
+      //     handleClaimTask(quest._id);
+      //   }
+      //   toast({ title: 'Already claimed', description: 'You have already claimed this quest.', variant: 'destructive' });
+      //   return;
+      // }
 
       if (!resp.ok) {
         const text = await resp.text().catch(() => String(resp.status));
@@ -367,22 +389,22 @@ export default function Quests() {
       console.log('[Quests] POST /api/xp/add SUCCESS:', json);
 
       // Sync claimedTasks from server (authoritative)
-      try {
-        const headers2: Record<string, string> = { "Content-Type": "application/json" };
-        const token2 = localStorage.getItem('accessToken');
-        if (token2) headers2['Authorization'] = `Bearer ${token2}`;
-        const r = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers: headers2 });
-        if (r.ok) {
-          const j = await r.json().catch(() => ({}));
-          const serverCompleted = Array.isArray(j?.completed) ? j.completed : [];
-          setClaimedTasks(serverCompleted);
-        } else {
-          handleClaimTask(quest.id);
-        }
-      } catch (e) {
-        console.warn('[Quests] failed to refresh claimedTasks after claim', e);
-        handleClaimTask(quest.id);
-      }
+      // try {
+      //   const headers2: Record<string, string> = { "Content-Type": "application/json" };
+      //   const token2 = localStorage.getItem('accessToken');
+      //   if (token2) headers2['Authorization'] = `Bearer ${token2}`;
+      //   const r = await fetch(buildUrl(`/api/quests/completed/${user.id}`), { headers: headers2 });
+      //   if (r.ok) {
+      //     const j = await r.json().catch(() => ({}));
+      //     const serverCompleted = Array.isArray(j?.completed) ? j.completed : [];
+      //     setClaimedTasks(serverCompleted);
+      //   } else {
+      //     handleClaimTask(questId);
+      //   }
+      // } catch (e) {
+      //   console.warn('[Quests] failed to refresh claimedTasks after claim', e);
+      //   handleClaimTask(questId);
+      // }
 
       // Emit session change so AuthProvider refetches profile
       try {
@@ -396,8 +418,8 @@ export default function Quests() {
       await new Promise((resolve) => setTimeout(resolve, 300));
 
       // Show success toast — prefer xp value from server result if available
-      const totalXp = (json && (json.xp || json.result?.xp)) ?? null;
-      toast({ title: 'XP awarded!', description: `+${xpAmount} XP earned${totalXp ? ` — total: ${totalXp} XP` : ''}` });
+      // const totalXp = (json && (json.xp || json.result?.xp)) ?? null;
+      toast({ title: 'XP awarded!' });
     } catch (e) {
       console.error('[Quests] Failed to persist XP:', e);
       toast({ title: 'Error', description: 'Failed to award XP. Please try again.', variant: 'destructive' });
@@ -405,15 +427,15 @@ export default function Quests() {
   };
 
   const performQuestAction = (quest: any) => {
-    if (quest.kind === 'external' && quest.url) {
+    if (quest.url) {
       // legacy fallback: open in new tab and mark visited. Prefer using anchors
       // in the UI so middle-click/right-click works — this path remains for
       // programmatic calls but UI now renders anchors for external actions.
       try { window.open(quest.url, '_blank', 'noopener'); } catch (e) {}
-      try { markVisited(quest.id); } catch(e){}
+      try { markVisited(quest._id); } catch(e){}
       // If this is an X social action, ask the server to verify (follow/like/retweet)
-      if (quest.id.startsWith('onetime-x-')) {
-        const action = quest.id.replace('onetime-','');
+      if (quest._id.startsWith('onetime-x-')) {
+        const action = quest._id.replace('onetime-','');
         // map to server endpoints
         const endpoint = action.includes('follow') ? '/quests/verify/follow' : action.includes('like') ? '/quests/verify/like' : action.includes('retweet') ? '/quests/verify/retweet' : null;
         if (endpoint) {
@@ -424,7 +446,7 @@ export default function Quests() {
                 .then(r => r.json().catch(() => null))
                 .then(json => {
                   // Do NOT auto-claim on verify success. Mark visited so the Claim button is enabled
-                  if (json && json.ok) markVisited(quest.id);
+                  if (json && json.ok) markVisited(quest._id);
                 }).catch(() => {});
             } catch (e) {
               // ignore - the user can manually press Claim after returning
@@ -439,22 +461,22 @@ export default function Quests() {
     if (quest.kind === 'connect-x') {
       // Start OAuth1 flow by redirecting to server endpoint which begins request_token flow
       try { window.location.href = '/auth/x/login'; } catch (e) {}
-      try { markVisited(quest.id); } catch(e){}
+      try { markVisited(quest._id); } catch(e){}
       return;
     }
     if (quest.kind === 'connect-discord') {
       setConnectedDiscord(true);
       try { localStorage.setItem('nexura:connected:discord', '1'); } catch(e){}
       // Do not auto-claim; enable claim button after connect
-      try { markVisited(quest.id); } catch(e){}
+      try { markVisited(quest._id); } catch(e){}
       return;
     }
     // default fallback: just mark visited (do not auto-claim). User must press the Claim button.
-    try { markVisited(quest.id); } catch(e){}
+    try { markVisited(quest._id); } catch(e){}
   };
 
   const renderQuestCard = (quest: any, showProgress = false) => (
-    <Card key={quest.id} className="overflow-hidden hover-elevate group" data-testid={`quest-${quest.id}`}>
+    <Card key={quest._id} className="overflow-hidden hover-elevate group" data-testid={`quest-${quest._id}`}>
       {/* Hero Image */}
       <div className="relative h-48 overflow-hidden">
         <img 
@@ -522,8 +544,8 @@ export default function Quests() {
           className="w-full" 
           variant={quest.completed ? "outline" : "quest"}
           disabled={quest.completed}
-          onClick={() => !quest.completed && setLocation(`/quest/${quest.id}?from=quests`)}
-          data-testid={`button-start-${quest.id}`}
+          onClick={() => !quest.completed && setLocation(`/quest/${quest._id}?from=quests`)}
+          data-testid={`button-start-${quest._id}`}
         >
           {quest.completed ? "Completed" : "Start Quest"}
         </Button>
@@ -634,7 +656,7 @@ export default function Quests() {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {campaignTasks.map(q => (
               <Card key={q.id} className="p-4 flex flex-col justify-between">
                 <div>
@@ -657,7 +679,7 @@ export default function Quests() {
                 </div>
               </Card>
             ))}
-          </div>
+          </div> */}
         </div>
 
         {/* Quest Tabs */}
@@ -678,33 +700,34 @@ export default function Quests() {
             <div>
               <h2 className="text-xl font-bold text-foreground mb-4">Daily Tasks</h2>
               <div className="text-sm text-muted-foreground mb-2">{
-                (() => {
-                  const server = claimableTotals.daily;
-                  if (typeof server === 'number') return `Claimable: +${server} XP`;
-                  const total = dailyQuestTasks.reduce((acc, t) => {
-                    const xp = typeof t.xp === 'number' ? t.xp : (typeof t.reward === 'string' ? (Number((t.reward.match(/(\d+)/) || [0])[0]) || 0) : 0);
-                    return acc + (claimedTasks.includes(t.id) ? 0 : xp);
-                  }, 0);
-                  return `Claimable: +${total} XP`;
-                })()
+                // (() => {
+                //   const server = claimableTotals.daily;
+                //   if (typeof server === 'number') return `Claimable: +${server} XP`;
+                //   const total = dailyQuestTasks.reduce((acc, t) => {
+                //     const xp = t.reward.xp || 0;
+                //     return acc + (claimedTasks.includes(t.id) ? 0 : xp);
+                //   }, 0);
+                //   return `Claimable: +${total} XP`;
+                // })()
+                `Claimable: +? XP`
               }</div>
               <p className="text-sm text-muted-foreground mb-6">
                 Complete these tasks today to earn XP • Resets every 24 hours
               </p>
             </div>
-            
+
             {/* Daily Tasks List */}
             <div className="space-y-4">
               {dailyQuestTasks.map((task) => (
-                <Card key={task.id} className="p-6" data-testid={`daily-task-${task.id}`}>
+                <Card key={task._id} className="p-6" data-testid={`daily-task-${task._id}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                        claimedTasks.includes(task.id) 
+                        task.done 
                           ? 'bg-green-500 border-green-500' 
                           : 'border-gray-300'
                       }`}>
-                        {claimedTasks.includes(task.id) && (
+                        {task.done && (
                           <CheckCircle className="w-4 h-4 text-white" />
                         )}
                       </div>
@@ -716,20 +739,20 @@ export default function Quests() {
                     
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
-                        <div className="font-semibold text-primary">{typeof task.xp === 'number' ? `+${task.xp} XP` : task.reward}</div>
+                        <div className="font-semibold text-primary">{`+${task.reward.xp} XP`}</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button size="sm" variant="default" onClick={() => { try { setLocation(`/quest/${task.id}`); markVisited(task.id); } catch(e){} }}>
-                          Start
+                        <Button size="sm" variant="default" onClick={() => { try { performQuestAction(task); markVisited(task._id); } catch(e){} }}>
+                          Go
                         </Button>
                         <Button 
                           size="sm"
-                          variant={claimedTasks.includes(task.id) ? "outline" : "quest"}
-                          disabled={!visitedTasks.includes(task.id) || claimedTasks.includes(task.id)}
-                          onClick={() => claimAndAwardXp(task)}
-                          data-testid={`claim-task-${task.id}`}
+                          variant={task.done ? "outline" : "quest"}
+                          disabled={!visitedTasks.includes(task._id) || task.done}
+                          onClick={() => claimAndAwardXp(task._id)}
+                          data-testid={`claim-task-${task._id}`}
                         >
-                          {claimLabelFor(task.id, task)}
+                          {task.done ? "Claimed" : `Claim ${task.reward.xp} XP`}
                         </Button>
                       </div>
                     </div>
@@ -744,12 +767,12 @@ export default function Quests() {
                 <div>
                   <h3 className="font-bold text-foreground">Daily Progress</h3>
                   <p className="text-sm text-muted-foreground">
-                    {dailyQuestTasks.filter(q => claimedTasks.includes(q.id)).length} of {dailyQuestTasks.length} tasks completed
+                    {dailyQuestTasks.filter(q => q.done === true).length} of {dailyQuestTasks.length} tasks completed
                   </p>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-primary">
-                    {dailyQuestTasks.length === 0 ? 0 : Math.round((dailyQuestTasks.filter(q => claimedTasks.includes(q.id)).length / dailyQuestTasks.length) * 100)}%
+                    {dailyQuestTasks.length === 0 ? 0 : Math.round((dailyQuestTasks.filter(q => q.done === true).length / dailyQuestTasks.length) * 100)}%
                   </div>
                   <div className="text-xs text-muted-foreground">Complete</div>
                 </div>
@@ -763,15 +786,16 @@ export default function Quests() {
             <div>
               <h2 className="text-xl font-bold text-foreground mb-4">One Time Quests</h2>
               <div className="text-sm text-muted-foreground mb-2">{
-                (() => {
-                  const server = claimableTotals.onetime;
-                  if (typeof server === 'number') return `Claimable: +${server} XP`;
-                  const total = oneTimeQuests.reduce((acc, q) => {
-                    const xp = typeof q.xp === 'number' ? q.xp : (typeof q.reward === 'string' ? (Number((q.reward.match(/(\d+)/) || [0])[0]) || 0) : 0);
-                    return acc + (claimedTasks.includes(q.id) ? 0 : xp);
-                  }, 0);
-                  return `Claimable: +${total} XP`;
-                })()
+                // (() => {
+                //   const server = claimableTotals.onetime;
+                //   if (typeof server === 'number') return `Claimable: +${server} XP`;
+                //   const total = oneTimeQuests.reduce((acc, q) => {
+                //     const xp = q.reward.xp || 0;
+                //     return acc + (claimedTasks.includes(q.id) ? 0 : xp);
+                //   }, 0);
+                //   return `Claimable: +${total} XP`;
+                // })()
+                `Claimable: +? XP`
               }</div>
               <p className="text-sm text-muted-foreground mb-6">
                 Complete these essential quests to unlock the full Nexura experience
@@ -781,15 +805,15 @@ export default function Quests() {
             {/* One Time Quests List */}
             <div className="space-y-4">
               {oneTimeQuests.map((quest) => (
-                <Card key={quest.id} className="p-6" data-testid={`onetime-task-${quest.id}`}>
+                <Card key={quest._id} className="p-6" data-testid={`onetime-task-${quest._id}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                        claimedTasks.includes(quest.id) 
+                        quest.done 
                           ? 'bg-green-500 border-green-500' 
                           : 'border-gray-300'
                       }`}>
-                        {claimedTasks.includes(quest.id) && (
+                        {quest.done && (
                           <CheckCircle className="w-4 h-4 text-white" />
                         )}
                       </div>
@@ -801,18 +825,18 @@ export default function Quests() {
                     
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
-                        <div className="font-semibold text-primary">{typeof quest.xp === 'number' ? `+${quest.xp} XP` : quest.reward}</div>
+                        <div className="font-semibold text-primary">{`+${quest.reward.xp} XP`}</div>
                       </div>
                       <div className="flex items-center gap-2">
                         {renderActionForQuest(quest)}
                         <Button
                           size="sm"
-                          variant={claimedTasks.includes(quest.id) ? "outline" : "quest"}
-                          disabled={!visitedTasks.includes(quest.id) || claimedTasks.includes(quest.id)}
-                          onClick={() => !claimedTasks.includes(quest.id) && claimAndAwardXp(quest)}
-                          data-testid={`claim-quest-${quest.id}`}
+                          variant={quest.done ? "outline" : "quest"}
+                          disabled={!visitedTasks.includes(quest._id) || quest.done}
+                          onClick={() => !quest.done && claimAndAwardXp(quest._id)}
+                          data-testid={`claim-quest-${quest._id}`}
                         >
-                          {claimLabelFor(quest.id, quest)}
+                          {quest.done ? "Claimed" : `Claim ${quest.reward.xp} XP`}
                         </Button>
                       </div>
                     </div>
@@ -827,12 +851,12 @@ export default function Quests() {
                 <div>
                   <h3 className="font-bold text-foreground">One Time Progress</h3>
                   <p className="text-sm text-muted-foreground">
-                    {oneTimeQuests.filter(q => claimedTasks.includes(q.id)).length} of {oneTimeQuests.length} quests completed
+                    {oneTimeQuests.filter(q => q.done === true).length} of {oneTimeQuests.length} quests completed
                   </p>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-primary">
-                    {oneTimeQuests.length === 0 ? 0 : Math.round((oneTimeQuests.filter(q => claimedTasks.includes(q.id)).length / oneTimeQuests.length) * 100)}%
+                    {oneTimeQuests.length === 0 ? 0 : Math.round((oneTimeQuests.filter(q => q.done === true).length / oneTimeQuests.length) * 100)}%
                   </div>
                   <div className="text-xs text-muted-foreground">Complete</div>
                 </div>
