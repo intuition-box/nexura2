@@ -40,7 +40,7 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const fullUrl = buildUrl(url);
+  const fullUrl = `https://server${url}`;
 
   const headers = buildAuthHeaders(data ? { "Content-Type": "application/json" } : {});
 
@@ -52,6 +52,26 @@ export async function apiRequest(
 
   await throwIfResNotOk(res);
   return res;
+}
+
+export async function apiRequestV2(
+  method: string,
+  url: string,
+  data?: unknown,
+): Promise<any> {
+  const fullUrl = `https://server${url}`;
+  const accessToken = localStorage.getItem("accessToken") || "";
+
+  const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}`}
+
+  const res = await fetch(fullUrl, {
+    method,
+    headers,
+    body: data ? JSON.stringify(data) : undefined,
+  });
+
+  await throwIfResNotOk(res);
+  return res.json();
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

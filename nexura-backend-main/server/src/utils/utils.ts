@@ -11,9 +11,9 @@ export const validateCampaignData = (reqData: any) => {
     endDate: z.string().trim(),
     reward: z.object({
       xp: z.number(),
-      tTrust: z.number()
+      // tTrust: z.number()
     }),
-    totaltTrustAvailable: z.number(),
+    totaltTrustAvailable: z.number().optional(),
     contractAddress: z.string().optional()
   });
 
@@ -30,7 +30,8 @@ export const validateQuestData = (reqData: any) => {
     reward: z.object({
       xp: z.number(),
       tTrust: z.number()
-    })
+    }),
+    url: z.string().trim().optional(),
   });
 
   const parseData = questSchema.safeParse(reqData);
@@ -40,10 +41,13 @@ export const validateQuestData = (reqData: any) => {
 
 export const validateTaskData = (reqData: any) => {
   const taskSchema = z.object({
-    task: z.string().trim(),
-    link: z.string().trim().optional(),
+    title: z.string().trim(),
+    description: z.string().trim(),
+    url: z.string().trim().optional(),
     campaign: z.string().trim(),
-    xp: z.number(),
+    reward: z.object({
+      xp: z.number()
+    }),
   });
 
   const parseData = taskSchema.safeParse(reqData);
@@ -83,10 +87,23 @@ export const validateProjectData = (reqData: any) => {
   const projectSchema = z.object({
     name: z.string().trim(),
     email: z.email().trim(),
-    logo: z.string().trim(),
+    description: z.string().trim(),
+    // password: z.string().trim(),
   });
 
   const parseData = projectSchema.safeParse(reqData);
+
+  return parseData;
+}
+
+export const validateUserSignUpData = (reqData: any) => {
+  const userSchema = z.object({
+    username: z.string().trim(),
+    email: z.email().trim().optional(),
+    // password: z.string().trim(),
+  });
+
+  const parseData = userSchema.safeParse(reqData);
 
   return parseData;
 }

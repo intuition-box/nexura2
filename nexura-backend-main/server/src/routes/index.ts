@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { home } from "@/controllers/app.controller";
+import { getLeaderboard, home } from "@/controllers/app.controller";
 import { fetchCampaigns } from "@/controllers/campaign.controller";
 import adminRoutes from "./admin.routes.ts";
 import campaignRoutes from "./campaign.routes.ts";
@@ -12,6 +12,7 @@ const router = Router();
 
 router
   .get("/", home)
+  .get("/leaderboard", getLeaderboard)
   .use("/admin", adminRoutes)
   .get("/ecosystem-tasks", fetchEcosystemDapps)
   .get("/quests", fetchQuests)

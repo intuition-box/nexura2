@@ -77,8 +77,12 @@ const questSchema = new Schema({
     },
     tTrust: {
       type: Number,
-      required: true
+      // required: true
     }
+  },
+  url: {
+    type: String,
+    required: false
   },
   category: {
     type: String,
