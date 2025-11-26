@@ -19,13 +19,11 @@
         try {
           if (window.__BACKEND_URL__) return;
           var origin = (window.location && window.location.origin) ? window.location.origin : undefined;
-          if (origin && origin.startsWith('https:')) {
-            window.__BACKEND_URL__ = origin;
-          } else {
-            window.__BACKEND_URL__ = "http://172.20.10.3:5051";
-          }
+          // Use the current origin as the default backend URL. If you need a separate API host,
+          // set `VITE_BACKEND_URL` in your Vercel environment and the client will use that.
+          window.__BACKEND_URL__ = origin || '';
         } catch (e) {
-          window.__BACKEND_URL__ = "http://172.20.10.3:5051";
+          window.__BACKEND_URL__ = '';
         }
       })();
     </script>
