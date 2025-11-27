@@ -133,11 +133,8 @@ export async function startServer() {
     // Start server
     const port = parseInt(process.env.PORT || '5051', 10);
     const host = process.env.HOST || "0.0.0.0";
-    // reusePort used on unix-like platforms
+    // Standard TCP listen options; avoid reusePort to prevent ENOTSUP on some systems
     const listenOptions: any = { port, host };
-    if (process.platform !== "win32") {
-      listenOptions.reusePort = true;
-    }
 
     server.listen(listenOptions, () => {
       logger.info(`Server running in ${process.env.NODE_ENV || 'development'} mode`);

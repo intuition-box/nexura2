@@ -42,5 +42,11 @@
     "password": "f2f8c4568e7660c8ba4d55d7",
     "address": "0x89f14062723e70917a6130f5eb13308b7f9618e5",
     "id": "2cc85b28-b20d-4724-ac6b-e989f489d1cc"
+  },
+  "02c8ead7-22c0-454e-9b69-30acc1d6bd44": {
+    "username": "0x6c2f4a1372852fade28dfe6827740d4c34ff3f19",
+    "password": "5cbfa83f7d42fa6a7653da55",
+    "address": "0x6c2f4a1372852fade28dfe6827740d4c34ff3f19",
+    "id": "02c8ead7-22c0-454e-9b69-30acc1d6bd44"
   }
 }
