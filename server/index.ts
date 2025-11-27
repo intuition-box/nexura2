@@ -8,7 +8,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import * as logger from './logger'
 
-const app = express();
+export const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -48,7 +48,7 @@ app.use((req, res, next) => {
 app.use("/attached_assets", express.static(path.resolve(import.meta.dirname, "..", "attached_assets")));
 app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 
-(async () => {
+export async function startServer() {
   try {
     const server = await registerRoutes(app);
 
@@ -59,9 +59,9 @@ app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
       try {
         const { seedTasks } = await import("./seedTasks");
         await seedTasks();
-          logger.info("Tasks seeded successfully");
+        logger.info("Tasks seeded successfully");
       } catch (error) {
-          logger.error("Failed to seed tasks: " + String(error));
+        logger.error("Failed to seed tasks: " + String(error));
       }
     }
 
@@ -70,7 +70,7 @@ app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
       const message = err.message || "Internal Server Error";
 
       res.status(status).json({ message });
-        logger.error('Express error handler', { err: String(err) });
+      logger.error('Express error handler', { err: String(err) });
     });
 
     // Setup vite in development
@@ -98,4 +98,15 @@ app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
     console.error('Failed to start server:', error);
     process.exit(1);
   }
-})();
+}
+
+// If this module is executed directly (e.g. `tsx server/index.ts`), start the server.
+// In ESM, we can detect this by comparing import.meta.url to the process argv entry.
+try {
+  if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+    // running directly
+    startServer();
+  }
+} catch (e) {
+  // ignore detection errors in unusual environments
+}
