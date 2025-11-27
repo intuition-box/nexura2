@@ -45,7 +45,7 @@ export async function query(text: string, params?: any[]) {
     const res = await client.query(text, params);
     return res;
   } finally {
-    // Some Neon pools don't need explicit release, but call if present
+    // Some Neon pools don't need explicit release, bujh/t call if present
     try { client.release(); } catch (e) { /* ignore */ }
   }
 }

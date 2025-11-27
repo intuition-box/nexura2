@@ -45,3 +45,10 @@ pids
 *.pid
 *.seed
 *.pid.lock
+.vercel
+.env*.local
+
+# Large assets (should be served from CDN or external storage)
+attached_assets/
+attached_assets/**/*
+*.log

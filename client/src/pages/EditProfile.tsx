@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth";
-import getSupabaseClient from "@/lib/supabaseClient";
 import { uploadFile } from "@/lib/upload";
 import { getSessionToken } from "@/lib/session";
 import { Button } from "@/components/ui/button";

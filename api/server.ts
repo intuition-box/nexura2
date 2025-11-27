@@ -9,7 +9,7 @@ import * as http from 'http';
 
 async function loadApp() {
   // Dynamically import so that any ESM/CJS interop is handled by the bundler/runtime.
-  const mod = await import('../server/index');
+  const mod: any = await import('../server/index');
 
   // Common export patterns:
   // - export const app = express();

@@ -504,7 +504,9 @@ export class MemStorage implements IStorage {
     const tasksCompleted = (current.tasksCompleted || 0) + (options?.tasksCompletedInc || 0);
     const updated = { ...current, xp: newXp, level: newLevel, questsCompleted, tasksCompleted };
     this.userProfiles.set(userId, updated);
-    console.log(`[MemStorage] addXpToUser userId=${userId} xpAmount=${xpAmount} prevXp=${current.xp||0} newXp=${newXp} prevLevel=${prevLevel} newLevel=${newLevel} questsCompleted=${questsCompleted} tasksCompleted=${tasksCompleted} (increments: +${options?.questsCompletedInc || 0} quests, +${options?.tasksCompletedInc || 0} tasks)`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[MemStorage] addXpToUser userId=${userId} xpAmount=${xpAmount} prevXp=${current.xp||0} newXp=${newXp} prevLevel=${prevLevel} newLevel=${newLevel} questsCompleted=${questsCompleted} tasksCompleted=${tasksCompleted} (increments: +${options?.questsCompletedInc || 0} quests, +${options?.tasksCompletedInc || 0} tasks)`);
+    }
     // persist to disk
     try {
       const dataDir = path.resolve(process.cwd(), "server", "data");
@@ -1299,7 +1301,11 @@ class NeonStorage extends MemStorage implements IStorage {
           tasksCompleted = options?.tasksCompletedInc || 0;
           await client.query(`INSERT INTO ${tbl} (xp, level, quests_completed, tasks_completed, created_at, updated_at) VALUES ($1,$2,$3,$4,now(),now())`, [newXp, newLevel, questsCompleted, tasksCompleted]);
         }
-        try { console.log(`[NeonStorage] addXpToUser userId=${userId} xpAmount=${xpAmount} newXp=${newXp} prevLevel=${prevLevel} newLevel=${newLevel}`); } catch (e) { }
+        try { 
+          if (process.env.NODE_ENV !== 'production') {
+            console.log(`[NeonStorage] addXpToUser userId=${userId} xpAmount=${xpAmount} newXp=${newXp} prevLevel=${prevLevel} newLevel=${newLevel}`);
+          }
+        } catch (e) { }
         await client.query("COMMIT");
         return { previousLevel: prevLevel, newLevel, xp: newXp, questsCompleted, tasksCompleted };
       }
@@ -1332,7 +1338,11 @@ class NeonStorage extends MemStorage implements IStorage {
           [userId, newXp, newLevel, questsCompleted, tasksCompleted]
         );
       }
-      try { console.log(`[NeonStorage] addXpToUser userId=${userId} xpAmount=${xpAmount} newXp=${newXp} prevLevel=${prevLevel} newLevel=${newLevel}`); } catch (e) { }
+      try { 
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[NeonStorage] addXpToUser userId=${userId} xpAmount=${xpAmount} newXp=${newXp} prevLevel=${prevLevel} newLevel=${newLevel}`);
+        }
+      } catch (e) { }
       await client.query("COMMIT");
       return { previousLevel: prevLevel, newLevel, xp: newXp, questsCompleted, tasksCompleted };
     } catch (e) {

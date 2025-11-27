@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "cross-env DOTENV_CONFIG_PATH=.env.local NODE_ENV=development tsx server/index.ts",
     "build": "vite build",
-    "build:full": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build:full": "vite build ; esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --target=es2022 --outfile=dist/index.js",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "migrate:neon": "node ./scripts/run_migration_neon.cjs",
     "check": "tsc",
@@ -14,11 +14,10 @@
     "render-build": "npm install && npm run build"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.520.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@neondatabase/serverless": "^0.10.4",
-    "serverless-http": "^2.8.0",
-    "@aws-sdk/client-s3": "^3.520.0",
     "@radix-ui/react-accordion": "^1.2.4",
     "@radix-ui/react-alert-dialog": "^1.1.7",
     "@radix-ui/react-aspect-ratio": "^1.1.3",
@@ -80,6 +79,7 @@
     "react-icons": "^5.4.0",
     "react-resizable-panels": "^2.1.7",
     "recharts": "^2.15.2",
+    "serverless-http": "^4.0.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "tw-animate-css": "^1.2.5",
@@ -108,13 +108,13 @@
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
     "cross-env": "^7.0.3",
-    "drizzle-kit": "^0.30.4",
+    "drizzle-kit": "^0.31.7",
     "esbuild": "^0.25.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.1",
     "typescript": "5.6.3",
-    "vite": "^5.4.19"
+    "vite": "^7.2.4"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"

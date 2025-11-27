@@ -27,6 +27,18 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'wouter'],
+          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
+          query: ['@tanstack/react-query'],
+          wallet: ['@reown/appkit', '@reown/appkit-adapter-wagmi', '@wagmi/core'],
+          charts: ['recharts'],
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000, // Increase limit to reduce warnings
   },
   server: {
     fs: {
