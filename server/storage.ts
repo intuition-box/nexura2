@@ -1,5 +1,5 @@
 import { type User, type InsertUser, type ReferralEvent, type InsertReferralEvent, type ReferralClaim, type InsertReferralClaim, type ReferralStats } from "@shared/schema";
-import { randomUUID, createHash } from "crypto";
+import { randomUUID, createHash, randomBytes } from "crypto";
 import fs from "fs";
 import path from "path";
 // optional Neon/Postgres-backed storage
@@ -68,6 +68,7 @@ export interface IStorage {
   // Campaign methods
   getAllCampaigns(): Promise<any[]>;
   getCampaignById(id: string): Promise<any | undefined>;
+  createCampaign(projectId: string, campaign: any): Promise<any>;
   // Campaign task methods
   createCampaignTask(task: any): Promise<any>;
   getCampaignTask(taskId: string): Promise<any | undefined>;
@@ -225,7 +226,7 @@ export class MemStorage implements IStorage {
   }
 
   async createSessionToken(userId: string, address?: string) {
-    const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomBytes(8).toString('hex');
+    const token = randomUUID().replace(/-/g, '') + randomBytes(8).toString('hex');
     this.sessionTokens.set(token, { userId, address: address || '', createdAt: new Date().toISOString() });
     return token;
   }
@@ -619,6 +620,42 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
+  async createCampaign(projectId: string, campaign: any): Promise<any> {
+    const id = campaign.id || randomUUID();
+    const createdAt = new Date().toISOString();
+    const c = {
+      id,
+      projectId,
+      title: campaign.title || campaign.name || 'Untitled campaign',
+      description: campaign.description || campaign.body || null,
+      imageUrl: campaign.imageUrl || campaign.image_url || null,
+      metadata: campaign.metadata || {},
+      isActive: campaign.isActive !== undefined ? Boolean(campaign.isActive) : true,
+      createdAt,
+      updatedAt: null,
+    } as any;
+
+    (this as any).projects = (this as any).projects || new Map();
+    const projects = (this as any).projects as Map<string, any>;
+    const proj = projects.get(projectId) || { id: projectId, campaigns: [] };
+    proj.campaigns = proj.campaigns || [];
+    proj.campaigns.push(c);
+    projects.set(projectId, proj);
+
+    // Persist projects to disk
+    try { this.persistProjects(); } catch (e) { /* ignore */ }
+
+    // If tasks supplied, create them
+    if (Array.isArray(campaign.tasks) && campaign.tasks.length) {
+      for (const t of campaign.tasks) {
+        const taskData = { ...t, campaignId: id, projectId };
+        await this.createCampaignTask(taskData);
+      }
+    }
+
+    return c;
+  }
+
   async createTask(task: any): Promise<any> {
     this.tasks.set(task.id, task);
     return task;
@@ -758,7 +795,7 @@ export class MemStorage implements IStorage {
  * Neon-backed storage implementation using raw SQL via @neondatabase/serverless.
  * Falls back gracefully to MemStorage when no DATABASE_URL or pool is unavailable.
  */
-class NeonStorage implements IStorage {
+class NeonStorage {
   private pool: any;
   constructor(pool: any) {
     this.pool = pool;
@@ -787,9 +824,9 @@ class NeonStorage implements IStorage {
   }
 
   // Create and persist a new session token
-  async createSessionToken(userId: string, address: string | null) {
+  async createSessionToken(userId: string, address?: string | null): Promise<string> {
     await this.ensureSessionTokensTable();
-    const token = require("crypto").randomBytes(32).toString("hex");
+    const token = randomBytes(32).toString("hex");
     try {
       const r = await this.query(
         `INSERT INTO user_session_tokens (token, user_id, address, created_at) VALUES ($1,$2,$3,now()) RETURNING token, created_at`,
@@ -833,6 +870,60 @@ class NeonStorage implements IStorage {
   async getUser(id: string) {
     const r = await this.query(`select * from users where id = $1 limit 1`, [id]);
     return r?.rows?.[0] || undefined;
+  }
+
+  async createCampaign(projectId: string, campaign: any): Promise<any> {
+    const id = campaign.id || randomUUID();
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const insertSql = `
+        INSERT INTO campaigns (id, project_id, title, description, image_url, metadata, is_active, created_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *
+      `;
+      const values = [
+        id,
+        projectId,
+        campaign.title || campaign.name || 'Untitled campaign',
+        campaign.description || null,
+        campaign.imageUrl || campaign.image_url || null,
+        JSON.stringify(campaign.metadata || {}),
+        campaign.isActive !== undefined ? (campaign.isActive ? 1 : 0) : 1,
+      ];
+      const r = await client.query(insertSql, values);
+      const created = r.rows?.[0];
+
+      // insert tasks if provided
+      if (Array.isArray(campaign.tasks) && campaign.tasks.length) {
+        for (const t of campaign.tasks) {
+          const taskId = t.id || randomUUID();
+          const taskSql = `INSERT INTO campaign_tasks (id, campaign_id, project_id, title, description, task_category, task_subtype, xp_reward, verification_config, is_active, order_index, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())`;
+          const taskVals = [
+            taskId,
+            id,
+            projectId,
+            t.title || t.name || null,
+            t.description || null,
+            t.taskCategory || t.group || null,
+            t.taskSubtype || t.type || null,
+            t.xpReward || 0,
+            typeof t.verificationConfig === 'string' ? t.verificationConfig : JSON.stringify(t.verificationConfig || {}),
+            t.isActive !== undefined ? (t.isActive ? 1 : 0) : 1,
+            t.orderIndex || 0,
+          ];
+          await client.query(taskSql, taskVals);
+        }
+      }
+
+      await client.query('COMMIT');
+      return created;
+    } catch (e) {
+      try { await client.query('ROLLBACK'); } catch (_) { }
+      console.warn('[NeonStorage] createCampaign failed', e);
+      throw e;
+    } finally {
+      client.release();
+    }
   }
 
   async getUserByUsername(username: string) {
@@ -1011,6 +1102,155 @@ class NeonStorage implements IStorage {
       )`;
       try { await this.query(altSql); } catch (err) { /* ignore */ }
     }
+  }
+
+  // Helper: similar per-user table helpers for profiles, level NFTs and oauth tokens
+  private getUserProfileTableName(userId: string) {
+    const hash = createHash('sha256').update(String(userId)).digest('hex').slice(0, 12);
+    return `user_profiles_u_${hash}`;
+  }
+
+  private async ensureUserProfileTable(userId: string) {
+    const tbl = this.getUserProfileTableName(userId);
+    const createSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      display_name varchar,
+      avatar varchar,
+      social_profiles jsonb DEFAULT '{}'::jsonb,
+      xp integer DEFAULT 0,
+      level integer DEFAULT 0,
+      quests_completed integer DEFAULT 0,
+      tasks_completed integer DEFAULT 0,
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now()
+    )`;
+    try { await this.query(createSql); } catch (e) {
+      // fallback without gen_random_uuid
+      const altSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+        id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        display_name varchar,
+        avatar varchar,
+        social_profiles jsonb DEFAULT '{}'::jsonb,
+        xp integer DEFAULT 0,
+        level integer DEFAULT 0,
+        quests_completed integer DEFAULT 0,
+        tasks_completed integer DEFAULT 0,
+        created_at timestamptz DEFAULT now(),
+        updated_at timestamptz DEFAULT now()
+      )`;
+      try { await this.query(altSql); } catch (_) { /* ignore */ }
+    }
+  }
+
+  private getUserLevelNftsTableName(userId: string) {
+    const hash = createHash('sha256').update(String(userId)).digest('hex').slice(0, 12);
+    return `user_level_nfts_u_${hash}`;
+  }
+
+  private async ensureUserLevelNftsTable(userId: string) {
+    const tbl = this.getUserLevelNftsTableName(userId);
+    const createSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      level integer NOT NULL,
+      token_id varchar,
+      tx_hash varchar,
+      metadata_uri varchar,
+      metadata_cid varchar,
+      status varchar,
+      job_id varchar,
+      created_at timestamptz DEFAULT now()
+    )`;
+    try { await this.query(createSql); } catch (e) {
+      const altSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+        id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        level integer NOT NULL,
+        token_id varchar,
+        tx_hash varchar,
+        metadata_uri varchar,
+        metadata_cid varchar,
+        status varchar,
+        job_id varchar,
+        created_at timestamptz DEFAULT now()
+      )`;
+      try { await this.query(altSql); } catch (_) { /* ignore */ }
+    }
+  }
+
+  private getUserOauthTableName(userId: string) {
+    const hash = createHash('sha256').update(String(userId)).digest('hex').slice(0, 12);
+    return `user_oauth_u_${hash}`;
+  }
+
+  private async ensureUserOauthTable(userId: string) {
+    const tbl = this.getUserOauthTableName(userId);
+    const createSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      provider varchar NOT NULL,
+      access_token text,
+      refresh_token text,
+      scope varchar,
+      expires_at timestamptz,
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now()
+    )`;
+    try { await this.query(createSql); } catch (e) {
+      const altSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+        id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        provider varchar NOT NULL,
+        access_token text,
+        refresh_token text,
+        scope varchar,
+        expires_at timestamptz,
+        created_at timestamptz DEFAULT now(),
+        updated_at timestamptz DEFAULT now()
+      )`;
+      try { await this.query(altSql); } catch (_) { /* ignore */ }
+    }
+  }
+
+  // Project-scoped campaign tables
+  private getProjectCampaignTasksTableName(projectId: string) {
+    const hash = createHash('sha256').update(String(projectId)).digest('hex').slice(0, 12);
+    return `project_${hash}_campaign_tasks`;
+  }
+
+  private async ensureProjectCampaignTasksTable(projectId: string) {
+    const tbl = this.getProjectCampaignTasksTableName(projectId);
+    const createSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      campaign_id varchar,
+      project_id varchar,
+      title varchar,
+      description text,
+      task_category varchar,
+      task_subtype varchar,
+      xp_reward integer,
+      verification_config jsonb,
+      is_active integer DEFAULT 1,
+      order_index integer DEFAULT 0,
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now()
+    )`;
+    try { await this.query(createSql); } catch (e) { /* ignore */ }
+  }
+
+  private getProjectCampaignTaskCompletionsTableName(projectId: string) {
+    const hash = createHash('sha256').update(String(projectId)).digest('hex').slice(0, 12);
+    return `project_${hash}_campaign_task_completions`;
+  }
+
+  private async ensureProjectCampaignTaskCompletionsTable(projectId: string) {
+    const tbl = this.getProjectCampaignTaskCompletionsTableName(projectId);
+    const createSql = `CREATE TABLE IF NOT EXISTS ${tbl} (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id varchar,
+      task_id varchar,
+      campaign_id varchar,
+      xp_awarded integer,
+      verification_data jsonb,
+      completed_at timestamptz DEFAULT now()
+    )`;
+    try { await this.query(createSql); } catch (e) { /* ignore */ }
   }
 
   // Quests catalog (Neon-backed)
@@ -1508,7 +1748,7 @@ class NeonStorage implements IStorage {
 }
 
 // Export storage: prefer NeonStorage when DATABASE_URL and pool exist, otherwise MemStorage
-let storageInstance: IStorage;
+let storageInstance: any;
 if (NeonPool) {
   try {
     storageInstance = new NeonStorage(NeonPool);

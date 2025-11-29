@@ -40,33 +40,20 @@ export default function ProjectDashboard({ params }: any) {
           </div>
 
           {/* Main content with padding and max-width */}
-          <div className="min-h-full px-8 py-8">
-            <div className="mx-auto max-w-6xl">
-              {/* Content wrapper with glass effect */}
-              <div className="rounded-2xl border border-border/30 bg-gradient-to-br from-background/40 via-background/20 to-background/10 backdrop-blur-xl shadow-2xl overflow-hidden">
-                <div className="p-8">
-                  {/* Render create page explicitly when URL matches to avoid router ordering/matching issues */}
-                  {location && location.startsWith(`${base}/campaigns/create`) ? (
-                    <ProjectCreateCampaign />
-                  ) : (
-                    <Switch>
-                      <Route path={`${base}/dashboard`} component={ProjectOverview} />
-                      <Route path={`${base}/campaigns`} component={ProjectTasks} />
-                      <Route path={`${base}/analytics`} component={ProjectAnalytics} />
-                      <Route path={`${base}/leaderboard`} component={ProjectLeaderboard} />
-                      <Route path={`${base}/collabs`} component={ProjectCollabs} />
-                      <Route path={`${base}/settings`} component={ProjectSettings} />
-                    </Switch>
-                  )}
-                </div>
-              </div>
-
-              {/* Subtle accent elements */}
-              <div className="pointer-events-none mt-12 flex justify-between opacity-10">
-                <div className="h-40 w-40 rounded-full bg-indigo-500 blur-3xl" />
-                <div className="h-40 w-40 rounded-full bg-cyan-500 blur-3xl" />
-              </div>
-            </div>
+          <div className="p-8">
+            {/* Render create page explicitly when URL matches to avoid router ordering/matching issues */}
+            {location && location.startsWith(`${base}/campaigns/create`) ? (
+              <ProjectCreateCampaign />
+            ) : (
+              <Switch>
+                <Route path={`${base}/dashboard`} component={ProjectOverview} />
+                <Route path={`${base}/campaigns`} component={ProjectTasks} />
+                <Route path={`${base}/analytics`} component={ProjectAnalytics} />
+                <Route path={`${base}/leaderboard`} component={ProjectLeaderboard} />
+                <Route path={`${base}/collabs`} component={ProjectCollabs} />
+                <Route path={`${base}/settings`} component={ProjectSettings} />
+              </Switch>
+            )}
           </div>
         </div>
       </div>

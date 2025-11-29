@@ -1,4 +1,4 @@
-import puppeteer from "puppeteer";
+﻿import puppeteer from "puppeteer";
 
 async function run() {
   const url = process.env.URL || "http://localhost:5051";
@@ -38,7 +38,7 @@ async function run() {
   await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
   // Allow time for client-side scripts (wallet injection, auth flows) to run
-  await page.waitForTimeout(5000);
+  await new Promise(r => setTimeout(r, 5000));
 
   // If there's a global window.__BACKEND_URL__ print it
   try {
@@ -56,3 +56,4 @@ run().catch((err) => {
   console.error("Collector failed:", err);
   process.exit(1);
 });
+

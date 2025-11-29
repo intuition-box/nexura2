@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import AnimatedBackground from "@/components/AnimatedBackground";
+import { useAuth } from "@/lib/auth";
 
 // Prefer a runtime-injected backend URL (window.__BACKEND_URL__), then Vite env var.
 // Do not default to localhost here — if no backend is configured the app will
@@ -23,6 +24,7 @@ type Entry = {
   username: string;
   display_name?: string;
   address?: string;
+  avatar?: string;
   xp: number;
   level: number;
   quests_completed?: number;
@@ -30,6 +32,7 @@ type Entry = {
 };
 
 export default function Leaderboard() {
+  const { user, loading: authLoading } = useAuth();
   const [list, setList] = useState<Entry[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,8 +63,32 @@ export default function Leaderboard() {
     };
   }, []);
 
-  if (loading) return (
-    <AuthGuard>
+  if (authLoading) return (
+    <div className="min-h-screen bg-black text-white overflow-auto p-6">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-6">Leaderboard</h1>
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-white/60">Checking authentication...</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!user) return (
+    <div className="min-h-screen bg-black text-white overflow-auto p-6">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-6">Leaderboard</h1>
+        <div className="p-6 text-center text-white/60">
+          <p className="mb-4">Please sign in to view the leaderboard.</p>
+          <p className="text-sm">Complete quests and tasks to see your ranking!</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderContent = () => {
+    if (loading) return (
       <div className="min-h-screen bg-black text-white overflow-auto p-6">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-6">Leaderboard</h1>
@@ -71,33 +98,27 @@ export default function Leaderboard() {
           </div>
         </div>
       </div>
-    </AuthGuard>
-  );
-  
-  if (error) return (
-    <AuthGuard>
+    );
+    
+    if (error) return (
       <div className="min-h-screen bg-black text-white overflow-auto p-6">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-6">Leaderboard</h1>
           <div className="p-6 text-center text-white/60">Error loading leaderboard: {error}</div>
         </div>
       </div>
-    </AuthGuard>
-  );
-  
-  if (!list || list.length === 0) return (
-    <AuthGuard>
+    );
+    
+    if (!list || list.length === 0) return (
       <div className="min-h-screen bg-black text-white overflow-auto p-6">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-6">Leaderboard</h1>
           <div className="p-6 text-center text-white/60">No leaderboard data yet. Complete quests to get on the board!</div>
         </div>
       </div>
-    </AuthGuard>
-  );
+    );
 
-  return (
-    <AuthGuard>
+    return (
       <div className="min-h-screen bg-black text-white overflow-auto p-6 relative">
         <AnimatedBackground />
         <div className="max-w-4xl mx-auto space-y-6 relative z-10">
@@ -163,6 +184,8 @@ export default function Leaderboard() {
           </div>
         </div>
       </div>
-    </AuthGuard>
-  );
+    );
+  };
+
+  return renderContent();
 }

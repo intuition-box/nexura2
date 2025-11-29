@@ -1258,7 +1258,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!campaign) {
         return res.status(404).json({ error: "campaign not found" });
       }
-      return res.json(campaign);
+
+      // Normalize campaign fields across storage implementations
+      const normalized: any = { ...campaign };
+      if (typeof campaign.is_active !== 'undefined') {
+        // Postgres/Neon uses numeric is_active
+        normalized.isActive = Number(campaign.is_active) === 1;
+      } else if (typeof campaign.isActive !== 'undefined') {
+        normalized.isActive = Boolean(campaign.isActive);
+      } else {
+        normalized.isActive = true;
+      }
+
+      // Try to attach project name if available from project record
+      try {
+        const projId = campaign.project_id || campaign.projectId || campaign.project;
+        if (projId) {
+          const proj = await storage.getProjectById(projId);
+          if (proj) normalized.project_name = proj.name || proj.project_name || proj.title || normalized.project_name;
+        }
+      } catch (e) {
+        // ignore enrichment errors
+      }
+
+      return res.json(normalized);
     } catch (err) {
       console.error("get campaign error", err);
       return res.status(500).json({ error: "failed to fetch campaign" });
@@ -1363,6 +1386,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create a campaign scoped to a project (requires auth + project ownership)
+  app.post('/api/projects/:projectId/campaigns', async (req, res) => {
+    try {
+      const sess = await getSessionFromReq(req);
+      if (!sess?.session) return res.status(401).json({ error: 'not authenticated' });
+
+      const { projectId } = req.params;
+      const project = await storage.getProjectById(projectId);
+      if (!project) return res.status(404).json({ error: 'project not found' });
+
+      // simple ownership check: either session.userId matches owner_user_id or session.address matches owner address
+      let allowed = false;
+      try {
+        if (sess.session.userId && (project.owner_user_id || project.ownerUserId) && String(project.owner_user_id || project.ownerUserId) === String(sess.session.userId)) allowed = true;
+        const sessAddr = String(sess.session.address || '').toLowerCase();
+        const projAddr = String(project.ownerAddress || project.owner_address || '').toLowerCase();
+        if (sessAddr && projAddr && sessAddr === projAddr) allowed = true;
+      } catch (e) { /* ignore */ }
+
+      if (!allowed) return res.status(403).json({ error: 'not allowed' });
+
+      const payload = req.body || {};
+
+      // Normalize incoming task shapes so storage implementations persist link/meta into verification_config
+      if (Array.isArray(payload.tasks) && payload.tasks.length) {
+        payload.tasks = payload.tasks.map((t: any, idx: number) => {
+          const task: any = {
+            id: t.id || t.taskId || undefined,
+            title: t.title || t.name || null,
+            description: t.description || t.body || null,
+            taskCategory: t.taskCategory || t.group || null,
+            taskSubtype: t.taskSubtype || t.type || null,
+            xpReward: typeof t.xpReward !== 'undefined' ? t.xpReward : typeof t.xp !== 'undefined' ? t.xp : 0,
+            isActive: typeof t.isActive !== 'undefined' ? (t.isActive ? 1 : 0) : 1,
+            orderIndex: typeof t.orderIndex !== 'undefined' ? t.orderIndex : idx,
+            // include link/meta inside verificationConfig so Neon/PG storage will persist them
+            verificationConfig: t.verificationConfig ?? { link: t.link ?? null, meta: t.meta ?? null },
+          };
+          return task;
+        });
+      }
+
+      // attach projectId on payload for storage implementations that expect it
+      const created = await storage.createCampaign(projectId, payload);
+      return res.status(201).json(created);
+    } catch (e) {
+      console.error('/api/projects/:projectId/campaigns error', e);
+      return res.status(500).json({ error: 'failed to create campaign' });
+    }
+  });
+
   // Campaign Tasks API
   app.post("/api/campaigns/:campaignId/tasks", async (req, res) => {
     try {
@@ -1373,14 +1447,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const campaign = await storage.getCampaignById(campaignId);
       if (!campaign) return res.status(404).json({ error: "campaign not found" });
       
-      // TODO: Validate project ownership/permissions
-      
+      // Validate project ownership/permissions: only project owner or owner address may create tasks
+      const sessObj = sess.session;
+      let allowed = false;
+      try {
+        const projId = campaign.project_id || campaign.projectId || null;
+        if (projId) {
+          const project = await storage.getProjectById(projId);
+          if (project) {
+            if (sessObj.userId && (project.owner_user_id || project.ownerUserId) && String(project.owner_user_id || project.ownerUserId) === String(sessObj.userId)) allowed = true;
+            const sessAddr = String(sessObj.address || '').toLowerCase();
+            const projAddr = String(project.ownerAddress || project.owner_address || '').toLowerCase();
+            if (sessAddr && projAddr && sessAddr === projAddr) allowed = true;
+          }
+        }
+      } catch (e) { /* ignore */ }
+
+      if (!allowed) return res.status(403).json({ error: 'not allowed' });
+
+      const body = req.body || {};
       const taskData = {
-        ...req.body,
+        ...body,
         campaignId,
-        projectId: campaign.project_id,
+        projectId: campaign.project_id || campaign.projectId || null,
+        // ensure verificationConfig contains link/meta if provided
+        verificationConfig: body.verificationConfig ?? { link: body.link ?? null, meta: body.meta ?? null },
       };
-      
+
       const task = await storage.createCampaignTask(taskData);
       return res.status(201).json(task);
     } catch (err) {
@@ -1392,6 +1485,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/campaigns/:campaignId/tasks", async (req, res) => {
     try {
       const { campaignId } = req.params;
+
+      const campaign = await storage.getCampaignById(campaignId);
+      if (!campaign) return res.status(404).json({ error: "campaign not found" });
+
+      // Determine published state across storage implementations
+      const isPublished = (typeof campaign.is_active !== 'undefined')
+        ? Number(campaign.is_active) === 1
+        : (typeof campaign.isActive !== 'undefined' ? Boolean(campaign.isActive) : true);
+
+      // If not published, only allow access to project owner (authenticated)
+      if (!isPublished) {
+        const sess = await getSessionFromReq(req).catch(() => null);
+        const session = sess?.session || null;
+        let allowed = false;
+        if (session) {
+          try {
+            const projId = campaign.project_id || campaign.projectId || campaign.project;
+            if (projId) {
+              const project = await storage.getProjectById(projId);
+              if (project) {
+                // match by user id or owner address
+                if (session.userId && (project.owner_user_id || project.ownerUserId) && String(project.owner_user_id || project.ownerUserId) === String(session.userId)) allowed = true;
+                const sessAddr = String(session.address || '').toLowerCase();
+                const projAddr = String(project.ownerAddress || project.owner_address || '').toLowerCase();
+                if (sessAddr && projAddr && sessAddr === projAddr) allowed = true;
+              }
+            }
+          } catch (e) {
+            // ignore checks
+          }
+        }
+
+        if (!allowed) return res.status(403).json({ error: 'campaign not published' });
+      }
+
       const tasks = await storage.getCampaignTasks(campaignId);
       return res.json(tasks);
     } catch (err) {
@@ -1512,9 +1640,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!task) return res.status(404).json({ error: "task not found" });
       if (task.campaignId !== campaignId) return res.status(400).json({ error: "task does not belong to campaign" });
       
-      // TODO: Validate project ownership/permissions
-      
-      await storage.updateCampaignTask(taskId, req.body);
+      // Validate project ownership/permissions: only project owner may update tasks
+      const sessObj = sess.session;
+      let allowed = false;
+      try {
+        const projId = task.projectId || task.project_id || null;
+        if (projId) {
+          const project = await storage.getProjectById(projId);
+          if (project) {
+            if (sessObj.userId && (project.owner_user_id || project.ownerUserId) && String(project.owner_user_id || project.ownerUserId) === String(sessObj.userId)) allowed = true;
+            const sessAddr = String(sessObj.address || '').toLowerCase();
+            const projAddr = String(project.ownerAddress || project.owner_address || '').toLowerCase();
+            if (sessAddr && projAddr && sessAddr === projAddr) allowed = true;
+          }
+        }
+      } catch (e) { /* ignore */ }
+
+      if (!allowed) return res.status(403).json({ error: 'not allowed' });
+
+      const updates = req.body || {};
+      if (typeof updates.link !== 'undefined' || typeof updates.meta !== 'undefined') {
+        updates.verificationConfig = updates.verificationConfig ?? { link: updates.link ?? null, meta: updates.meta ?? null };
+      }
+
+      await storage.updateCampaignTask(taskId, updates);
       const updated = await storage.getCampaignTask(taskId);
       return res.json(updated);
     } catch (err) {
@@ -1533,8 +1682,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!task) return res.status(404).json({ error: "task not found" });
       if (task.campaignId !== campaignId) return res.status(400).json({ error: "task does not belong to campaign" });
       
-      // TODO: Validate project ownership/permissions
-      
+      // Validate project ownership/permissions: only project owner may delete tasks
+      const sessObj = sess.session;
+      let allowed = false;
+      try {
+        const projId = task.projectId || task.project_id || null;
+        if (projId) {
+          const project = await storage.getProjectById(projId);
+          if (project) {
+            if (sessObj.userId && (project.owner_user_id || project.ownerUserId) && String(project.owner_user_id || project.ownerUserId) === String(sessObj.userId)) allowed = true;
+            const sessAddr = String(sessObj.address || '').toLowerCase();
+            const projAddr = String(project.ownerAddress || project.owner_address || '').toLowerCase();
+            if (sessAddr && projAddr && sessAddr === projAddr) allowed = true;
+          }
+        }
+      } catch (e) { /* ignore */ }
+
+      if (!allowed) return res.status(403).json({ error: 'not allowed' });
+
       await storage.deleteCampaignTask(taskId);
       return res.json({ success: true });
     } catch (err) {

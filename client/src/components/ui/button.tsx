@@ -34,6 +34,11 @@ const buttonVariants = cva(
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
+  // Keep className explicitly available to consumers and TypeScript tooling.
+  // We extend ButtonHTMLAttributes above which already includes className,
+  // but declaring it here avoids issues with some TS setups / JSX tooling
+  // that may not correctly merge the inherited attribute type in all places.
+  className?: string;
   asChild?: boolean;
 }
 
