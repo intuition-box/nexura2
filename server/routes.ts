@@ -6,7 +6,9 @@ import crypto from "crypto";
 import { verifyMessage } from "ethers";
 import fs from "fs";
 import path from "path";
-import campaignsRouter from "../api/campaigns";
+// import campaignsRouter from "../api/campaigns";
+import campaignRoutes from "../api/campaign.routes";
+
 import questsRouter from "../api/quests";
 
 // Optional S3-compatible upload support for production (recommended for serverless)
@@ -57,9 +59,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: 'failed', details: String(e) });
     }
   });
-
+  
   // campaign
-  app.use("/api/campaigns", campaignsRouter);
+  app.use("/api/campaigns", campaignRoutes);
   app.use("/api/quests", questsRouter)
   // Referral system routes
   app.get("/api/referrals/stats/:userId", async (req, res) => {
