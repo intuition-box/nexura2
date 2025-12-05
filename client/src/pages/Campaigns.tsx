@@ -6,6 +6,7 @@ import { Calendar, Clock, Users, ExternalLink } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import AnimatedBackground from "@/components/AnimatedBackground";
+import CampaignEnvironment from "./CampaignEnvironment";
 
 interface Campaign {
   id: string;
@@ -20,11 +21,18 @@ interface Campaign {
 }
 
 export default function Campaigns() {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const [, setLocation] = useLocation();
-
   const { data: campaigns = [], isLoading } = useQuery<Campaign[]>({
-    queryKey: ["/api/campaigns"],
-  });
+  queryKey: ["/api/campaigns"],
+  queryFn: async () => {
+    const res = await fetch(`${backendUrl}/api/campaigns`);
+    if (!res.ok) throw new Error("Failed to fetch campaigns");
+    return res.json();
+  },
+});
+
+console.log("CAMPAIGNS FROM SERVER:", campaigns);
 
   // Separate active and upcoming campaigns
   const now = new Date();
@@ -41,89 +49,112 @@ export default function Campaigns() {
     return start > now;
   });
 
-  const renderCampaignCard = (campaign: Campaign) => {
-    const metadata = campaign.metadata ? JSON.parse(campaign.metadata) : {};
-    const isActive = activeCampaigns.some(c => c.id === campaign.id);
-    const status = isActive ? "Active" : "Coming Soon";
-    
-    return (
-      <Card key={campaign.id} className="overflow-hidden hover-elevate group" data-testid={`campaign-${campaign.id}`}>
-        {/* Hero Image */}
-        <div className="relative h-48 overflow-hidden bg-gradient-to-br from-purple-700/20 via-blue-600/20 to-cyan-500/20">
-          {campaign.project_image && (
-            <img 
-              src={campaign.project_image} 
-              alt={campaign.name}
-              className="w-full h-full object-cover transition-transform group-hover:scale-105"
-            />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-          
-          {/* Status Badge */}
-          <div className="absolute top-4 right-4">
-            <Badge 
-              className={
-                isActive
-                  ? "bg-green-500/10 text-green-500 border-green-500/30"
-                  : "bg-blue-500/10 text-blue-500 border-blue-500/30"
-              }
-            >
-              {status}
-            </Badge>
-          </div>
-          
-          {/* Category */}
-          {metadata.category && (
-            <div className="absolute top-4 left-4">
-              <div className="text-sm text-white/80 font-medium">{metadata.category}</div>
-            </div>
-          )}
+const renderCampaignCard = (campaign: Campaign) => {
+  let metadata: any = {};
+  try {
+    metadata = campaign.metadata ? JSON.parse(campaign.metadata) : {};
+  } catch {
+    metadata = {};
+  }
+
+  const isActive = activeCampaigns.some(c => c.id === campaign.id);
+  const status = isActive ? "Active" : "Coming Soon";
+
+  return (
+    <Card
+      key={campaign.id}
+      className="
+        bg-[#0d1117] border border-white/5 rounded-2xl 
+        overflow-hidden shadow-lg hover:shadow-xl transition 
+      "
+      data-testid={`campaign-${campaign.id}`}
+    >
+      {/* Hero Section */}
+      <div className="relative h-44 bg-black">
+        {campaign.project_image && (
+<img
+  src={campaign.project_image}
+  alt={campaign.name}
+  className="w-full h-full object-cover rounded-t-2xl"
+/>
+
+        )}
+
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+
+        {/* Status Badge */}
+        <div className="absolute top-3 right-3">
+          <Badge
+            className={
+              isActive
+                ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+            }
+          >
+            {status}
+          </Badge>
         </div>
-      
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg font-semibold">{campaign.name}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-muted-foreground text-sm">{campaign.description}</p>
-        
-        <div className="space-y-3">
+
+        {/* Optional Category */}
+        {metadata.category && (
+          <div className="absolute top-3 left-3 text-xs text-white/80 font-medium">
+            {metadata.category}
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="p-5 space-y-3">
+        <h2 className="text-lg font-semibold text-white">{campaign.name}</h2>
+        <p className="text-sm text-gray-400 leading-relaxed">{campaign.description}</p>
+
+        {/* Info List */}
+        <div className="space-y-2 pt-2">
           {campaign.project_name && (
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Project:</span>
-              <span className="font-medium">{campaign.project_name}</span>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Project:</span>
+              <span className="text-white">{campaign.project_name}</span>
             </div>
           )}
+
           {metadata.participants !== undefined && (
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Participants:</span>
-              <span className="font-medium">{metadata.participants?.toLocaleString() || 0}</span>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Participants:</span>
+              <span className="text-white">{metadata.participants?.toLocaleString()}</span>
             </div>
           )}
-          {metadata.rewardPool && (
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Rewards:</span>
-              <div className="flex items-center space-x-1">
-                <span className="text-blue-500 font-bold">50XP</span>
-                <span className="text-muted-foreground">+</span>
-                <span className="font-medium text-primary">{metadata.rewardPool}</span>
-              </div>
-            </div>
-          )}
+
+{/* Rewards Section */}
+<div className="flex justify-between text-sm">
+  <span className="text-gray-500">Rewards:</span>
+  <span className="text-white flex items-center space-x-1">
+    <span className="font-semibold text-white">3000 tTrust</span>
+    <span className="font-medium text-yellow-400 ml-2">
+      (first come, first serve)
+    </span>
+  </span>
+</div>
+
+
           {campaign.starts_at && campaign.ends_at && (
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Duration:</span>
-              <span className="font-medium">
-                {new Date(campaign.starts_at).toLocaleDateString()} - {new Date(campaign.ends_at).toLocaleDateString()}
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Duration:</span>
+              <span className="text-white">
+                {new Date(campaign.starts_at).toLocaleDateString()} –{" "}
+                {new Date(campaign.ends_at).toLocaleDateString()}
               </span>
             </div>
           )}
         </div>
 
-        <Button 
-          className="w-full" 
+        {/* Action Button */}
+        <Button
+          className="
+            w-full bg-[#1f6feb] hover:bg-[#388bfd] 
+            text-white font-medium rounded-xl mt-3
+          "
           disabled={!isActive}
           onClick={() => isActive && setLocation(`/campaign/${campaign.id}`)}
-          data-testid={`button-join-${campaign.id}`}
         >
           {isActive ? (
             <>
@@ -137,10 +168,11 @@ export default function Campaigns() {
             </>
           )}
         </Button>
-      </CardContent>
+      </div>
     </Card>
   );
 };
+
 
   return (
     <div className="min-h-screen bg-black text-white overflow-auto p-6 relative" data-testid="campaigns-page">
