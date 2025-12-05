@@ -6,6 +6,9 @@ import crypto from "crypto";
 import { verifyMessage } from "ethers";
 import fs from "fs";
 import path from "path";
+import campaignsRouter from "../api/campaigns";
+import questsRouter from "../api/quests";
+
 // Optional S3-compatible upload support for production (recommended for serverless)
 let s3Client: any = null;
 let S3_BUCKET: string | undefined = undefined;
@@ -39,7 +42,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       environment: process.env.NODE_ENV || 'development'
     });
   });
-
+  
   // Debug endpoint to inspect incoming headers and session-like info.
   app.get('/api/debug-session', (req, res) => {
     const secret = process.env.DEBUG_SESSION_SECRET || null;
@@ -55,6 +58,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // campaign
+  app.use("/api/campaigns", campaignsRouter);
+  app.use("/api/quests", questsRouter)
   // Referral system routes
   app.get("/api/referrals/stats/:userId", async (req, res) => {
     try {
@@ -1596,5 +1602,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.listen(5051, () => console.log("Server running on 5051"));
   return httpServer;
 }
